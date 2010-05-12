@@ -73,6 +73,8 @@ config TEGRA_FIQ_DEBUGGER
 	help
 	  Enables the FIQ serial debugger on Tegra"
 
+source "arch/arm/mach-tegra/nv/Kconfig"
+
 endif
 
 config TEGRA_IOVMM_GART
