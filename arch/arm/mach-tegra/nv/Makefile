@@ -16,6 +16,3 @@ obj-$(CONFIG_TEGRA_NVRM)	+= nvreftrack/
 
 obj-$(CONFIG_TEGRA_NVOS)	+= nvos_user.o
 obj-$(CONFIG_TEGRA_NVOS)	+= nvos/
-
-obj-$(CONFIG_TEGRA_IOVMM)	+= iovmm.o
-obj-$(CONFIG_TEGRA_IOVMM)	+= iovmm-gart.o
