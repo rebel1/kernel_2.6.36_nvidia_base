@@ -1,7 +1,7 @@
 obj-y                                   += common.o
 obj-y                                   += io.o
 obj-y                                   += irq.o legacy_irq.o
-obj-y					+= syncpt.o
+obj-y                                   += syncpt.o
 obj-y                                   += clock.o
 obj-y                                   += timer.o
 obj-y                                   += gpio.o
@@ -9,9 +9,10 @@ obj-y                                   += pinmux.o
 obj-y                                   += devices.o
 obj-y                                   += delay.o
 obj-y                                   += powergate.o
-obj-y					+= suspend.o
-obj-y					+= fuse.o
-obj-y					+= tegra_i2s_audio.o
+obj-y                                   += suspend.o
+obj-y                                   += fuse.o
+obj-y                                   += tegra_i2s_audio.o
+
 obj-$(CONFIG_USB_SUPPORT)               += usb_phy.o
 obj-$(CONFIG_FIQ)                       += fiq.o
 obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
@@ -21,21 +22,22 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_dvfs.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += suspend-t2.o
-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_save.o
-obj-$(CONFIG_CPU_V7)			+= cortex-a9.o
+obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_save.o
+obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += pinmux-t2-tables.o
+obj-$(CONFIG_CPU_V7)                    += cortex-a9.o
 
-obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-t2-tables.o
 ifeq ($(CONFIG_SMP),y)
 obj-y                                   += platsmp.o localtimer.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += headsmp-t2.o
 endif
-obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
+
+obj-$(CONFIG_TEGRA_SYSTEM_DMA)          += dma.o
 obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
-obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+obj-$(CONFIG_CPU_IDLE)                  += cpuidle.o
 obj-$(CONFIG_TEGRA_IOVMM)               += iovmm.o
 obj-$(CONFIG_TEGRA_IOVMM_GART)          += iovmm-gart.o
 
-obj-y					+= nv/
+obj-y                                   += nv/
 
 obj-${CONFIG_MACH_HARMONY}              += board-harmony.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-pinmux.o
@@ -47,3 +49,4 @@ obj-${CONFIG_MACH_VENTANA}              += board-ventana-pinmux.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-sdhci.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-power.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-panel.o
+obj-${CONFIG_MACH_VENTANA}              += board-ventana-sensors.o
