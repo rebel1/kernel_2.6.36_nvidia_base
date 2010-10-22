@@ -553,10 +553,20 @@ void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 	mutex_lock(&fb_info->info->lock);
 	fb_destroy_modedb(fb_info->info->monspecs.modedb);
 
+	fb_destroy_modelist(&fb_info->info->modelist);
+
+	if (specs == NULL) {
+		struct tegra_dc_mode mode;
+		memset(&fb_info->info->monspecs, 0x0,
+		       sizeof(fb_info->info->monspecs));
+		memset(&mode, 0x0, sizeof(mode));
+		tegra_dc_set_mode(fb_info->win->dc, &mode);
+		mutex_unlock(&fb_info->info->lock);
+		return;
+	}
+
 	memcpy(&fb_info->info->monspecs, specs,
 	       sizeof(fb_info->info->monspecs));
-
-	fb_destroy_modelist(&fb_info->info->modelist);
 
 	for (i = 0; i < specs->modedb_len; i++) {
 		if (mode_filter) {
@@ -702,6 +712,11 @@ struct tegra_fb_info *tegra_fb_register(struct nvhost_device *ndev,
 	tegra_fb->info = info;
 
 	dev_info(&ndev->dev, "probed\n");
+
+	if (fb_data->flags & TEGRA_FB_FLIP_ON_PROBE) {
+		tegra_dc_update_windows(&tegra_fb->win, 1);
+		tegra_dc_sync_windows(&tegra_fb->win, 1);
+	}
 
 	return tegra_fb;
 
