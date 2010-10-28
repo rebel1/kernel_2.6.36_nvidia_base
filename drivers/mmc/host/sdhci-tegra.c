@@ -43,6 +43,14 @@ static irqreturn_t carddetect_irq(int irq, void *data)
 	return IRQ_HANDLED;
 };
 
+static void tegra_sdhci_status_notify_cb(int card_present, void *dev_id)
+{
+	struct sdhci_host *sdhci = (struct sdhci_host *)dev_id;
+	pr_debug("%s: card_present %d\n",
+		mmc_hostname(sdhci->mmc), card_present);
+	sdhci_card_detect_callback(sdhci);
+}
+
 static int tegra_sdhci_enable_dma(struct sdhci_host *host)
 {
 	return 0;
@@ -115,6 +123,13 @@ static int __devinit tegra_sdhci_probe(struct platform_device *pdev)
 
 	if (plat->force_hs != 0)
 		sdhci->quirks |= SDHCI_QUIRK_FORCE_HIGH_SPEED_MODE;
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+	mmc_set_embedded_sdio_data(sdhci->mmc,
+			&plat->cis,
+			&plat->cccr,
+			plat->funcs,
+			plat->num_funcs);
+#endif
 
 	rc = sdhci_add_host(sdhci);
 	if (rc)
@@ -129,6 +144,9 @@ static int __devinit tegra_sdhci_probe(struct platform_device *pdev)
 
 		if (rc)
 			goto err_remove_host;
+	} else if (plat->register_status_notify) {
+		plat->register_status_notify(
+			tegra_sdhci_status_notify_cb, sdhci);
 	}
 
 	if (plat->board_probe)

@@ -79,6 +79,7 @@ static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	{ "uartd",	"pll_p",	216000000,	true},
 	{ "pll_m",	"clk_m",	600000000,	true},
 	{ "pwm",	"clk_32k",	32768,		false},
+	{ "blink",	"clk_32k",	32768,		false},
 	{ NULL,		NULL,		0,		0},
 };
 
