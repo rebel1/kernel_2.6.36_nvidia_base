@@ -143,6 +143,16 @@ int nvmap_ioctl_getid(struct file *filp, void __user *arg)
 
 	h = nvmap_get_handle_id(client, op.handle);
 
+#ifdef CONFIG_NVMAP_SEARCH_GLOBAL_HANDLES
+	/*
+	 * Check for device-wide global handles. This may be needed in broken
+	 * memory sharing scenarios when handles are passed from client to
+	 * client instead of the memory IDs.
+	 */
+	if (!h)
+		h = nvmap_validate_get(client, op.handle);
+#endif
+
 	if (!h)
 		return -EPERM;
 

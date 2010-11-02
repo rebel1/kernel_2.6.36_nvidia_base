@@ -77,5 +77,16 @@ config NVMAP_CARVEOUT_KILLER
 	  processes. This will kill the largest consumers of lowest priority
 	  first.
 
+config NVMAP_SEARCH_GLOBAL_HANDLES
+	bool "Check global handle list when generating memory IDs"
+	depends on TEGRA_NVMAP
+	default n
+	help
+	  Say Y here to allow the system to search through memory handles not
+	  owned by the caller when generating a memory ID.  This shouldn't be
+	  necessary for well-written applications, but is provided for
+	  compatibility with legacy applications.
+	  If unsure, say N.
+
 endif
 
