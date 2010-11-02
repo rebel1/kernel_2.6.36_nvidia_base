@@ -71,6 +71,7 @@ struct nvmap_handle {
 	size_t size;		/* padded (as-allocated) size */
 	size_t orig_size;	/* original (as-requested) size */
 	struct nvmap_client *owner;
+	struct nvmap_device *dev;
 	union {
 		struct nvmap_pgalloc pgalloc;
 		struct nvmap_heap_block *carveout;
@@ -79,6 +80,7 @@ struct nvmap_handle {
 	bool secure;		/* zap IOVMM area on unpin */
 	bool heap_pgalloc;	/* handle is page allocated (sysmem / iovmm) */
 	bool alloc;		/* handle has memory allocated */
+	struct mutex lock;
 };
 
 struct nvmap_share {
@@ -92,15 +94,22 @@ struct nvmap_share {
 #endif
 };
 
+struct nvmap_carveout_commit {
+	size_t commit;
+	struct list_head list;
+};
+
 struct nvmap_client {
-	struct nvmap_device *dev;
-	struct nvmap_share *share;
-	struct rb_root	handle_refs;
-	atomic_t	iovm_commit;
-	size_t		iovm_limit;
-	spinlock_t	ref_lock;
-	bool		super;
-	atomic_t	count;
+	struct nvmap_device		*dev;
+	struct nvmap_share		*share;
+	struct rb_root			handle_refs;
+	atomic_t			iovm_commit;
+	size_t				iovm_limit;
+	spinlock_t			ref_lock;
+	bool				super;
+	atomic_t			count;
+	struct task_struct		*task;
+	struct nvmap_carveout_commit	carveout_commit[0];
 };
 
 /* handle_ref objects are client-local references to an nvmap_handle;
@@ -145,6 +154,16 @@ struct nvmap_heap_block *nvmap_carveout_alloc(struct nvmap_client *dev,
 
 unsigned long nvmap_carveout_usage(struct nvmap_client *c,
 				   struct nvmap_heap_block *b);
+
+struct nvmap_carveout_node;
+void nvmap_carveout_commit_add(struct nvmap_client *client,
+			       struct nvmap_carveout_node *node, size_t len);
+
+void nvmap_carveout_commit_subtract(struct nvmap_client *client,
+				    struct nvmap_carveout_node *node,
+				    size_t len);
+
+struct nvmap_share *nvmap_get_share_from_dev(struct nvmap_device *dev);
 
 struct nvmap_handle *nvmap_validate_get(struct nvmap_client *client,
 					unsigned long handle);

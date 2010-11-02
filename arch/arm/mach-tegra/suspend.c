@@ -37,10 +37,13 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 
+#include <linux/regulator/machine.h>
+
 #include <asm/cacheflush.h>
 #include <asm/hardware/cache-l2x0.h>
 #include <asm/hardware/gic.h>
 #include <asm/localtimer.h>
+#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
 #include <mach/iomap.h>
@@ -52,15 +55,21 @@
 #include "board.h"
 #include "power.h"
 
-/* NOTE: only add elements to the end of this structure, since the assembly
- * code uses hard-coded offsets */
-struct suspend_context
-{
+struct suspend_context {
+	/*
+	 * The next 7 values are referenced by offset in __restart_plls
+	 * in headsmp-t2.S, and should not be moved
+	 */
+	u32 pllx_misc;
+	u32 pllx_base;
+	u32 pllp_misc;
+	u32 pllp_base;
+	u32 pllp_outa;
+	u32 pllp_outb;
+	u32 pll_timeout;
+
 	u32 cpu_burst;
 	u32 clk_csite_src;
-	u32 pllx_base;
-	u32 pllx_misc;
-	u32 pllx_timeout;
 	u32 twd_ctrl;
 	u32 twd_load;
 	u32 cclk_divider;
@@ -68,13 +77,11 @@ struct suspend_context
 
 volatile struct suspend_context tegra_sctx;
 
-#ifdef CONFIG_HOTPLUG_CPU
 static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 static void __iomem *flow_ctrl = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE);
 static void __iomem *evp_reset = IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE)+0x100;
 static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
-#endif
 
 #define PMC_CTRL		0x0
 #define PMC_CTRL_LATCH_WAKEUPS	(1 << 5)
@@ -102,6 +109,11 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 #define CLK_RESET_PLLM_BASE	0x90
 #define CLK_RESET_PLLX_BASE	0xe0
 #define CLK_RESET_PLLX_MISC	0xe4
+#define CLK_RESET_PLLP_BASE	0xa0
+#define CLK_RESET_PLLP_OUTA	0xa4
+#define CLK_RESET_PLLP_OUTB	0xa8
+#define CLK_RESET_PLLP_MISC	0xac
+
 #define CLK_RESET_SOURCE_CSITE	0x1d4
 
 
@@ -112,10 +124,21 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
 #define FLOW_CTRL_CPU_CSR	0x8
 #define FLOW_CTRL_CPU1_CSR	0x18
 
+unsigned long tegra_pgd_phys;  /* pgd used by hotplug & LP2 bootup */
+static pgd_t *tegra_pgd;
+void *tegra_context_area = NULL;
+
 static struct clk *tegra_pclk = NULL;
 static const struct tegra_suspend_platform_data *pdata = NULL;
 static unsigned long wb0_restore = 0;
 static enum tegra_suspend_mode current_suspend_mode;
+
+static unsigned int tegra_time_in_suspend[32];
+
+static inline unsigned int time_to_bin(unsigned int time)
+{
+	return fls(time);
+}
 
 unsigned long tegra_cpu_power_good_time(void)
 {
@@ -166,6 +189,67 @@ static void set_power_timers(unsigned long us_on, unsigned long us_off,
 	last_pclk = pclk;
 }
 
+static int create_suspend_pgtable(void)
+{
+	int i;
+	pmd_t *pmd;
+	/* arrays of virtual-to-physical mappings which must be
+	 * present to safely boot hotplugged / LP2-idled CPUs.
+	 * tegra_hotplug_startup (hotplug reset vector) is mapped
+	 * VA=PA so that the translation post-MMU is the same as
+	 * pre-MMU, IRAM is mapped VA=PA so that SDRAM self-refresh
+	 * can safely disable the MMU */
+	unsigned long addr_v[] = {
+		PHYS_OFFSET,
+		IO_IRAM_PHYS,
+		(unsigned long)tegra_context_area,
+#ifdef CONFIG_HOTPLUG_CPU
+		(unsigned long)virt_to_phys(tegra_hotplug_startup),
+#endif
+		(unsigned long)__cortex_a9_restore,
+		(unsigned long)virt_to_phys(__shut_off_mmu),
+	};
+	unsigned long addr_p[] = {
+		PHYS_OFFSET,
+		IO_IRAM_PHYS,
+		(unsigned long)virt_to_phys(tegra_context_area),
+#ifdef CONFIG_HOTPLUG_CPU
+		(unsigned long)virt_to_phys(tegra_hotplug_startup),
+#endif
+		(unsigned long)virt_to_phys(__cortex_a9_restore),
+		(unsigned long)virt_to_phys(__shut_off_mmu),
+	};
+	unsigned int flags = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+		PMD_SECT_WBWA | PMD_SECT_S;
+
+	tegra_pgd = pgd_alloc(&init_mm);
+	if (!tegra_pgd)
+		return -ENOMEM;
+
+	for (i=0; i<ARRAY_SIZE(addr_p); i++) {
+		unsigned long v = addr_v[i];
+		pmd = pmd_offset(tegra_pgd + pgd_index(v), v);
+		*pmd = __pmd((addr_p[i] & PGDIR_MASK) | flags);
+		flush_pmd_entry(pmd);
+		outer_clean_range(__pa(pmd), __pa(pmd + 1));
+	}
+
+	tegra_pgd_phys = virt_to_phys(tegra_pgd);
+	__cpuc_flush_dcache_area(&tegra_pgd_phys,
+		sizeof(tegra_pgd_phys));
+	outer_clean_range(__pa(&tegra_pgd_phys),
+		__pa(&tegra_pgd_phys+1));
+
+	__cpuc_flush_dcache_area(&tegra_context_area,
+		sizeof(tegra_context_area));
+	outer_clean_range(__pa(&tegra_context_area),
+		__pa(&tegra_context_area+1));
+
+	return 0;
+}
+
+
+
 /*
  * suspend_cpu_complex
  *
@@ -185,7 +269,7 @@ static noinline void restore_cpu_complex(void)
 	BUG_ON(readl(clk_rst + CLK_RESET_PLLX_BASE) != tegra_sctx.pllx_base);
 
 	if (tegra_sctx.pllx_base & (1<<30)) {
-		while (readl(tmrus)-tegra_sctx.pllx_timeout >= 0x80000000UL)
+		while (readl(tmrus)-tegra_sctx.pll_timeout >= 0x80000000UL)
 			cpu_relax();
 	}
 	writel(tegra_sctx.cclk_divider, clk_rst + CLK_RESET_CCLK_DIVIDER);
@@ -199,8 +283,10 @@ static noinline void restore_cpu_complex(void)
 	writel(reg, flow_ctrl + FLOW_CTRL_CPU_CSR);
 	wmb();
 
+#ifdef CONFIG_HAVE_ARM_TWD
 	writel(tegra_sctx.twd_ctrl, twd_base + 0x8);
 	writel(tegra_sctx.twd_load, twd_base + 0);
+#endif
 
 	gic_dist_restore(0);
 	get_irq_chip(IRQ_LOCALTIMER)->unmask(IRQ_LOCALTIMER);
@@ -222,11 +308,17 @@ static noinline void suspend_cpu_complex(void)
 	tegra_sctx.cpu_burst = readl(clk_rst + CLK_RESET_CCLK_BURST);
 	tegra_sctx.pllx_base = readl(clk_rst + CLK_RESET_PLLX_BASE);
 	tegra_sctx.pllx_misc = readl(clk_rst + CLK_RESET_PLLX_MISC);
+	tegra_sctx.pllp_base = readl(clk_rst + CLK_RESET_PLLP_BASE);
+	tegra_sctx.pllp_outa = readl(clk_rst + CLK_RESET_PLLP_OUTA);
+	tegra_sctx.pllp_outb = readl(clk_rst + CLK_RESET_PLLP_OUTB);
+	tegra_sctx.pllp_misc = readl(clk_rst + CLK_RESET_PLLP_MISC);
 	tegra_sctx.cclk_divider = readl(clk_rst + CLK_RESET_CCLK_DIVIDER);
 
+#ifdef CONFIG_HAVE_ARM_TWD
 	tegra_sctx.twd_ctrl = readl(twd_base + 0x8);
 	tegra_sctx.twd_load = readl(twd_base + 0);
 	local_timer_stop();
+#endif
 
 	reg = readl(flow_ctrl + FLOW_CTRL_CPU_CSR);
 	/* clear any pending events, set the WFE bitmap to specify just
@@ -386,6 +478,11 @@ static void tegra_suspend_dram(bool do_lp0)
 	wmb();
 }
 
+static int tegra_suspend_begin(suspend_state_t state)
+{
+	return regulator_suspend_prepare(state);
+}
+
 static int tegra_suspend_prepare_late(void)
 {
 	disable_irq(INT_SYS_STATS_MON);
@@ -473,6 +570,10 @@ static int tegra_suspend_enter(suspend_state_t state)
 	bool do_lp0 = (current_suspend_mode == TEGRA_SUSPEND_LP0);
 	bool do_lp2 = (current_suspend_mode == TEGRA_SUSPEND_LP2);
 	int lp_state;
+	u64 rtc_before;
+	u64 rtc_after;
+	u64 secs;
+	u32 ms;
 
 	if (do_lp2)
 		lp_state = 2;
@@ -482,6 +583,7 @@ static int tegra_suspend_enter(suspend_state_t state)
 		lp_state = 1;
 
 	local_irq_save(flags);
+	local_fiq_disable();
 
 	pr_info("Entering suspend state LP%d\n", lp_state);
 	if (do_lp0) {
@@ -505,10 +607,14 @@ static int tegra_suspend_enter(suspend_state_t state)
 		}
 	}
 
+	rtc_before = tegra_rtc_read_ms();
+
 	if (do_lp2)
 		tegra_suspend_lp2(0);
 	else
 		tegra_suspend_dram(do_lp0);
+
+	rtc_after = tegra_rtc_read_ms();
 
 	for_each_irq_desc(irq, desc) {
 		if ((desc->status & IRQ_WAKEUP) &&
@@ -534,6 +640,13 @@ static int tegra_suspend_enter(suspend_state_t state)
 		tegra_irq_resume();
 	}
 
+	secs = rtc_after - rtc_before;
+	ms = do_div(secs, 1000);
+	pr_info("Suspended for %llu.%03u seconds\n", secs, ms);
+
+	tegra_time_in_suspend[time_to_bin(secs)]++;
+
+	local_fiq_enable();
 	local_irq_restore(flags);
 
 	return 0;
@@ -541,6 +654,7 @@ static int tegra_suspend_enter(suspend_state_t state)
 
 static struct platform_suspend_ops tegra_suspend_ops = {
 	.valid		= suspend_valid_only_mem,
+	.begin		= tegra_suspend_begin,
 	.prepare_late	= tegra_suspend_prepare_late,
 	.wake		= tegra_suspend_wake,
 	.enter		= tegra_suspend_enter,
@@ -563,6 +677,13 @@ void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat)
 		pr_warning("Suspend mode LP0 requested, but missing lp0_vec\n");
 		pr_warning("Disabling LP0\n");
 		plat->suspend_mode = TEGRA_SUSPEND_LP1;
+	}
+
+	tegra_context_area = kzalloc(CONTEXT_SIZE_BYTES * NR_CPUS, GFP_KERNEL);
+
+	if (tegra_context_area && create_suspend_pgtable()) {
+		kfree(tegra_context_area);
+		tegra_context_area = NULL;
 	}
 
 #ifdef CONFIG_PM
@@ -672,6 +793,33 @@ static const struct file_operations tegra_suspend_debug_fops = {
 	.release	= single_release,
 };
 
+static int tegra_suspend_time_debug_show(struct seq_file *s, void *data)
+{
+	int bin;
+	seq_printf(s, "time (secs)  count\n");
+	seq_printf(s, "------------------\n");
+	for (bin = 0; bin < 32; bin++) {
+		if (tegra_time_in_suspend[bin] == 0)
+			continue;
+		seq_printf(s, "%4d - %4d %4u\n",
+			bin ? 1 << (bin - 1) : 0, 1 << bin,
+			tegra_time_in_suspend[bin]);
+	}
+	return 0;
+}
+
+static int tegra_suspend_time_debug_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, tegra_suspend_time_debug_show, NULL);
+}
+
+static const struct file_operations tegra_suspend_time_debug_fops = {
+	.open		= tegra_suspend_time_debug_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 static int __init tegra_suspend_debug_init(void)
 {
 	struct dentry *d;
@@ -680,6 +828,13 @@ static int __init tegra_suspend_debug_init(void)
 		(void *)&current_suspend_mode, &tegra_suspend_debug_fops);
 	if (!d) {
 		pr_info("Failed to create suspend_mode debug file\n");
+		return -ENOMEM;
+	}
+
+	d = debugfs_create_file("suspend_time", 0755, NULL, NULL,
+		&tegra_suspend_time_debug_fops);
+	if (!d) {
+		pr_info("Failed to create suspend_time debug file\n");
 		return -ENOMEM;
 	}
 

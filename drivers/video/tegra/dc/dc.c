@@ -34,6 +34,7 @@
 #include <mach/clk.h>
 #include <mach/dc.h>
 #include <mach/fb.h>
+#include <mach/mc.h>
 #include <mach/nvhost.h>
 
 #include "dc_reg.h"
@@ -226,6 +227,7 @@ static void _dump_regs(struct tegra_dc *dc, void *data,
 		DUMP_REG(DC_WINBUF_START_ADDR);
 		DUMP_REG(DC_WINBUF_ADDR_H_OFFSET);
 		DUMP_REG(DC_WINBUF_ADDR_V_OFFSET);
+		DUMP_REG(DC_WINBUF_UFLOW_STATUS);
 	}
 
 	tegra_dc_io_end(dc);
@@ -584,8 +586,25 @@ int tegra_dc_sync_windows(struct tegra_dc_win *windows[], int n)
 }
 EXPORT_SYMBOL(tegra_dc_sync_windows);
 
+static unsigned long tegra_dc_pclk_round_rate(struct tegra_dc *dc, int pclk)
+{
+	unsigned long rate;
+	unsigned long div;
+
+	rate = clk_get_rate(dc->clk);
+
+	div = DIV_ROUND_CLOSEST(rate * 2, pclk);
+
+	if (div < 2)
+		return 0;
+
+	return rate * 2 / div;
+}
+
 void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk)
 {
+	int pclk;
+
 	if (dc->out->type == TEGRA_DC_OUT_HDMI) {
 		unsigned long rate;
 		struct clk *pll_d_out0_clk =
@@ -604,6 +623,10 @@ void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk)
 		if (clk_get_parent(clk) != pll_d_out0_clk)
 			clk_set_parent(clk, pll_d_out0_clk);
 	}
+
+	pclk = tegra_dc_pclk_round_rate(dc, dc->mode.pclk);
+	tegra_dvfs_set_rate(clk, pclk);
+
 }
 
 static int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode)
@@ -611,6 +634,7 @@ static int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode
 	unsigned long val;
 	unsigned long rate;
 	unsigned long div;
+	unsigned long pclk;
 
 	tegra_dc_writel(dc, 0x0, DC_DISP_DISP_TIMING_OPTIONS);
 	tegra_dc_writel(dc, mode->h_ref_to_sync | (mode->v_ref_to_sync << 16),
@@ -645,17 +669,18 @@ static int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode
 
 	rate = clk_get_rate(dc->clk);
 
-	div = ((rate * 2 + mode->pclk / 2) / mode->pclk) - 2;
-
-	if (rate * 2 / (div + 2) < (mode->pclk / 100 * 99) ||
-	    rate * 2 / (div + 2) > (mode->pclk / 100 * 109)) {
+	pclk = tegra_dc_pclk_round_rate(dc, mode->pclk);
+	if (pclk < (mode->pclk / 100 * 99) ||
+	    pclk > (mode->pclk / 100 * 109)) {
 		dev_err(&dc->ndev->dev,
 			"can't divide %ld clock to %d -1/+9%% %ld %d %d\n",
 			rate, mode->pclk,
-			rate / div, (mode->pclk / 100 * 99),
+			pclk, (mode->pclk / 100 * 99),
 			(mode->pclk / 100 * 109));
 		return -EINVAL;
 	}
+
+	div = (rate * 2 / pclk) - 2;
 
 	tegra_dc_writel(dc, 0x00010001,
 			DC_DISP_SHIFT_CLOCK_OPTIONS);
@@ -792,9 +817,31 @@ static void tegra_dc_init(struct tegra_dc *dc)
 	if (dc->ndev->id == 0) {
 		disp_syncpt = NVSYNCPT_DISP0;
 		vblank_syncpt = NVSYNCPT_VBLANK0;
+
+		tegra_mc_set_priority(TEGRA_MC_CLIENT_DISPLAY0A,
+				      TEGRA_MC_PRIO_MED);
+		tegra_mc_set_priority(TEGRA_MC_CLIENT_DISPLAY0B,
+				      TEGRA_MC_PRIO_MED);
+		tegra_mc_set_priority(TEGRA_MC_CLIENT_DISPLAY0C,
+				      TEGRA_MC_PRIO_MED);
+		tegra_mc_set_priority(TEGRA_MC_CLIENT_DISPLAY1B,
+				      TEGRA_MC_PRIO_MED);
+		tegra_mc_set_priority(TEGRA_MC_CLIENT_DISPLAYHC,
+				      TEGRA_MC_PRIO_HIGH);
 	} else if (dc->ndev->id == 1) {
 		disp_syncpt = NVSYNCPT_DISP1;
 		vblank_syncpt = NVSYNCPT_VBLANK1;
+
+		tegra_mc_set_priority(TEGRA_MC_CLIENT_DISPLAY0AB,
+				      TEGRA_MC_PRIO_MED);
+		tegra_mc_set_priority(TEGRA_MC_CLIENT_DISPLAY0BB,
+				      TEGRA_MC_PRIO_MED);
+		tegra_mc_set_priority(TEGRA_MC_CLIENT_DISPLAY0CB,
+				      TEGRA_MC_PRIO_MED);
+		tegra_mc_set_priority(TEGRA_MC_CLIENT_DISPLAY1BB,
+				      TEGRA_MC_PRIO_MED);
+		tegra_mc_set_priority(TEGRA_MC_CLIENT_DISPLAYHCB,
+				      TEGRA_MC_PRIO_HIGH);
 	}
 	tegra_dc_writel(dc, 0x00000100 | vblank_syncpt, DC_CMD_CONT_SYNCPT_VSYNC);
 	tegra_dc_writel(dc, 0x00004700, DC_CMD_INT_TYPE);
@@ -861,6 +908,7 @@ static void _tegra_dc_disable(struct tegra_dc *dc)
 
 	disable_irq(dc->irq);
 	clk_disable(dc->clk);
+	tegra_dvfs_set_rate(dc->clk, 0);
 
 	if (dc->out && dc->out->disable)
 		dc->out->disable();
