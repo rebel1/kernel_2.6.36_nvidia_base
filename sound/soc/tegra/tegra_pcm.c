@@ -121,13 +121,13 @@ static void tegra_pcm_capture(struct tegra_runtime_data *prtd)
 	if (runtime->dma_addr) {
 		prtd->size = frames_to_bytes(runtime, runtime->period_size);
 		if (reqid == 0) {
-			prtd->dma_req1.source_addr = buf->addr +
+			prtd->dma_req1.dest_addr = buf->addr +
 				+ frames_to_bytes(runtime,prtd->dma_pos);
 			prtd->dma_req1.size = prtd->size;
 			tegra_dma_enqueue_req(prtd->dma_chan, &prtd->dma_req1);
 			reqid = 1;
 		} else {
-			prtd->dma_req2.source_addr = buf->addr +
+			prtd->dma_req2.dest_addr = buf->addr +
 				+ frames_to_bytes(runtime,prtd->dma_pos);
 			prtd->dma_req2.size = prtd->size;
 			tegra_dma_enqueue_req(prtd->dma_chan, &prtd->dma_req2);
@@ -161,7 +161,7 @@ static void setup_dma_rx_request(struct tegra_dma_req *req)
 	memset(req, 0, sizeof(*req));
 	req->complete = dma_rx_complete_callback;
 	req->to_memory = true;
-	req->dest_addr = i2s_get_fifo_phy_base(I2S_IFC, I2S_FIFO_RX);
+	req->source_addr = i2s_get_fifo_phy_base(I2S_IFC, I2S_FIFO_RX);
 	req->dest_wrap = 0;
 	req->source_bus_width = 32;
 	req->source_wrap = 4;
