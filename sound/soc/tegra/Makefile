@@ -1,0 +1,6 @@
+ccflags-y += -DNV_DEBUG=0
+obj-$(CONFIG_TEGRA_PCM) += tegra_pcm.o
+obj-$(CONFIG_TEGRA_I2S) += tegra_i2s.o
+obj-$(CONFIG_TEGRA_ALSA) += tegra_soc.o
+
+

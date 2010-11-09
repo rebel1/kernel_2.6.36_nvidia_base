@@ -945,6 +945,7 @@ static int wm8903_set_bias_level(struct snd_soc_codec *codec,
 		reg &= ~(WM8903_VMID_RES_MASK);
 		reg |= WM8903_VMID_RES_50K;
 		snd_soc_write(codec, WM8903_VMID_CONTROL_0, reg);
+		snd_soc_write(codec, WM8903_BIAS_CONTROL_0, 0xB);
 		break;
 
 	case SND_SOC_BIAS_STANDBY:

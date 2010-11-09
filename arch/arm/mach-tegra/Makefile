@@ -12,14 +12,16 @@ obj-y                                   += delay.o
 obj-y                                   += powergate.o
 obj-y                                   += suspend.o
 obj-y                                   += fuse.o
+ifeq ($(CONFIG_TEGRA_ALSA),y)
+obj-y                                   += i2s_api.o
+else
 obj-y                                   += tegra_i2s_audio.o
+endif
 obj-y                                   += mc.o
-
 obj-$(CONFIG_USB_SUPPORT)               += usb_phy.o
 obj-$(CONFIG_FIQ)                       += fiq.o
 obj-$(CONFIG_TEGRA_FIQ_DEBUGGER)        += tegra_fiq_debugger.o
 obj-$(CONFIG_TEGRA_PWM)                 += pwm.o
-
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_dvfs.o
