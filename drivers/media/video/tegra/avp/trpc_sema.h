@@ -1,10 +1,8 @@
 /*
- * arch/arm/mach-tegra/include/mach/clk.h
- *
  * Copyright (C) 2010 Google, Inc.
  *
  * Author:
- *	Erik Gilling <konkers@google.com>
+ *   Dima Zavin <dima@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -17,15 +15,14 @@
  *
  */
 
-#ifndef __MACH_CLK_H
-#define __MACH_CLK_H
+#ifndef __ARM_MACH_TEGRA_RPC_SEMA_H
+#define __ARM_MACH_TEGRA_RPC_SEMA_H
 
-struct dvfs;
+#include <linux/types.h>
+#include <linux/fs.h>
 
-void tegra_periph_reset_deassert(struct clk *c);
-void tegra_periph_reset_assert(struct clk *c);
-
-int tegra_dvfs_set_rate(struct clk *c, unsigned long rate);
-unsigned long clk_get_rate_all_locked(struct clk *c);
+struct file *trpc_sema_get_from_fd(int fd);
+int trpc_sema_signal(struct file *file);
+int __init trpc_sema_init(void);
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * drivers/media/video/tegra/isp.c
+ * drivers/media/video/tegra/tegra_camera.c
  *
  * Copyright (C) 2010 Google, Inc.
  *

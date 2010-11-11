@@ -46,6 +46,7 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
+#include <mach/clk.h>
 #include <mach/iomap.h>
 #include <mach/iovmm.h>
 #include <mach/irqs.h>
@@ -358,12 +359,13 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 	writel(virt_to_phys(tegra_lp2_startup), evp_reset);
 
 	set_power_timers(pdata->cpu_timer, pdata->cpu_off_timer,
-			 clk_get_rate(tegra_pclk));
+			 clk_get_rate_all_locked(tegra_pclk));
 
 	if (us)
 		tegra_lp2_set_trigger(us);
 
 	suspend_cpu_complex();
+	stop_critical_timings();
 	flush_cache_all();
 	/* structure is written by reset code, so the L2 lines
 	 * must be invalidated */
@@ -374,6 +376,7 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 	/* return from __cortex_a9_restore */
 	barrier();
 	restore_cpu_complex();
+	start_critical_timings();
 
 	remain = tegra_lp2_timer_remain();
 	if (us)
