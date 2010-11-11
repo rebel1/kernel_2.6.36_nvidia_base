@@ -240,7 +240,6 @@ static struct tegra_i2c_platform_data ventana_dvc_platform_data = {
 };
 
 static struct tegra_audio_platform_data tegra_audio_pdata = {
-	.master		= false,
 	.dma_on		= true,  /* use dma by default */
 	.i2s_clk_rate	= 240000000,
 	.dap_clk	= "clk_dev1",
