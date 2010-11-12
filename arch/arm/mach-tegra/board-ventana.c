@@ -35,7 +35,6 @@
 #include <linux/input.h>
 #include <linux/tegra_usb.h>
 #include <linux/usb/android_composite.h>
-
 #include <mach/clk.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
@@ -147,6 +146,7 @@ static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	{ "pll_m",	"clk_m",	600000000,	true},
 	{ "uartc",      "pll_m",        600000000,      false},
 	{ "blink",      "clk_32k",      32768,          false},
+	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "blink",	"clk_32k",	32768,		false},
 	{ "pll_a",	NULL,		11289600,	true},
@@ -201,6 +201,16 @@ static struct i2c_board_info __initdata ventana_i2c_bus1_board_info[] = {
 	},
 };
 
+static struct tegra_ulpi_config ventana_ehci2_ulpi_phy_config = {
+	.reset_gpio = TEGRA_GPIO_PV1,
+	.clk = "clk_dev2",
+};
+
+static struct tegra_ehci_platform_data ventana_ehci2_ulpi_platform_data = {
+	.operating_mode = TEGRA_USB_HOST,
+	.power_down_on_bus_suspend = 0,
+	.phy_config = &ventana_ehci2_ulpi_phy_config,
+};
 
 static struct tegra_i2c_platform_data ventana_i2c1_platform_data = {
 	.adapter_nr	= 0,
@@ -304,6 +314,7 @@ static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_uart2_device,
 	&pmu_device,
 	&tegra_udc_device,
+	&tegra_ehci2_device,
 	&tegra_gart_device,
 	&ventana_keys_device,
 	&tegra_wdt_device,
@@ -376,6 +387,8 @@ static void __init tegra_ventana_init(void)
 	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata;
+	tegra_ehci2_device.dev.platform_data
+		= &ventana_ehci2_ulpi_platform_data;
 	platform_add_devices(ventana_devices, ARRAY_SIZE(ventana_devices));
 
 	ventana_sdhci_init();
