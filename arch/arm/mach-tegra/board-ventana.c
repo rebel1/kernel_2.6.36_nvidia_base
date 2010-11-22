@@ -306,6 +306,11 @@ static struct platform_device ventana_keys_device = {
 	},
 };
 
+static struct platform_device tegra_camera = {
+	.name = "tegra_camera",
+	.id = -1,
+};
+
 static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_otg_device,
 	&androidusb_device,
@@ -319,6 +324,7 @@ static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_wdt_device,
 	&tegra_i2s_device1,
 	&tegra_avp_device,
+	&tegra_camera,
 };
 
 static void ventana_keys_init(void)
