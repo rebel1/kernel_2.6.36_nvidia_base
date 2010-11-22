@@ -26,7 +26,6 @@
 #include <linux/clk.h>
 #include <linux/serial_8250.h>
 #include <linux/i2c.h>
-#include <linux/i2c/panjit_ts.h>
 #include <linux/dma-mapping.h>
 #include <linux/delay.h>
 #include <linux/i2c-tegra.h>
@@ -35,6 +34,15 @@
 #include <linux/input.h>
 #include <linux/tegra_usb.h>
 #include <linux/usb/android_composite.h>
+
+#ifdef CONFIG_TOUCHSCREEN_PANJIT_I2C
+#include <linux/i2c/panjit_ts.h>
+#endif
+
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MT_T9
+#include <linux/i2c/atmel_maxtouch.h>
+#endif
+
 #include <mach/clk.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
@@ -336,19 +344,20 @@ static void ventana_keys_init(void)
 		tegra_gpio_enable(ventana_keys[i].gpio);
 }
 
+#ifdef CONFIG_TOUCHSCREEN_PANJIT_I2C
 static struct panjit_i2c_ts_platform_data panjit_data = {
 	.gpio_reset = TEGRA_GPIO_PQ7,
 };
 
 static const struct i2c_board_info ventana_i2c_bus1_touch_info[] = {
 	{
-		I2C_BOARD_INFO("panjit_touch", 0x3),
-		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV6),
-		.platform_data	= &panjit_data,
-	},
+	 I2C_BOARD_INFO("panjit_touch", 0x3),
+	 .irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV6),
+	 .platform_data = &panjit_data,
+	 },
 };
 
-static int __init ventana_touch_init(void)
+static int __init ventana_touch_init_panjit(void)
 {
 	tegra_gpio_enable(TEGRA_GPIO_PV6);
 
@@ -357,7 +366,60 @@ static int __init ventana_touch_init(void)
 
 	return 0;
 }
+#endif
 
+#ifdef CONFIG_TOUCHSCREEN_ATMEL_MT_T9
+/* Atmel MaxTouch touchscreen              Driver data */
+/*-----------------------------------------------------*/
+/*
+ * Reads the CHANGELINE state; interrupt is valid if the changeline
+ * is low.
+ */
+static u8 read_chg()
+{
+	return gpio_get_value(TEGRA_GPIO_PV6);
+}
+
+static u8 valid_interrupt()
+{
+	return !read_chg();
+}
+
+static struct mxt_platform_data Atmel_mxt_info = {
+	/* Maximum number of simultaneous touches to report. */
+	.numtouch = 10,
+	// TODO: no need for any hw-specific things at init/exit?
+	.init_platform_hw = NULL,
+	.exit_platform_hw = NULL,
+	.max_x = 1366,
+	.max_y = 768,
+	.valid_interrupt = &valid_interrupt,
+	.read_chg = &read_chg,
+};
+
+static struct i2c_board_info __initdata i2c_info[] = {
+	{
+	 I2C_BOARD_INFO("maXTouch", MXT_I2C_ADDRESS),
+	 .irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PV6),
+	 .platform_data = &Atmel_mxt_info,
+	 },
+};
+
+static int __init ventana_touch_init_atmel(void)
+{
+	tegra_gpio_enable(TEGRA_GPIO_PV6);	/* FIXME:  Ventana-specific GPIO assignment     */
+	tegra_gpio_enable(TEGRA_GPIO_PQ7);	/* FIXME:  Ventana-specific GPIO assignment     */
+
+	gpio_set_value(TEGRA_GPIO_PQ7, 0);
+	msleep(1);
+	gpio_set_value(TEGRA_GPIO_PQ7, 1);
+	msleep(100);
+
+	i2c_register_board_info(0, i2c_info, 1);
+
+	return 0;
+}
+#endif
 
 static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	[0] = {
@@ -459,7 +521,13 @@ static void __init tegra_ventana_init(void)
 	ventana_i2c_init();
 	ventana_charge_init();
 	ventana_regulator_init();
-	ventana_touch_init();
+#ifdef	CONFIG_TOUCHSCREEN_PANJIT_I2C
+	ventana_touch_init_panjit();
+#endif
+#ifdef  CONFIG_TOUCHSCREEN_ATMEL_MT_T9
+	ventana_touch_init_atmel();
+#endif
+
 	ventana_keys_init();
 	ventana_usb_init();
 	ventana_gps_init();
