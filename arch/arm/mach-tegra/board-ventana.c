@@ -144,11 +144,10 @@ static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "uartd",	"pll_p",	216000000,	true},
 	{ "pll_m",	"clk_m",	600000000,	true},
-	{ "uartc",      "pll_m",        600000000,      false},
-	{ "blink",      "clk_32k",      32768,          false},
+	{ "uartc",	"pll_m",	600000000,	false},
+	{ "blink",	"clk_32k",	32768,		false},
 	{ "pll_p_out4",	"pll_p",	24000000,	true },
 	{ "pwm",	"clk_32k",	32768,		false},
-	{ "blink",	"clk_32k",	32768,		false},
 	{ "pll_a",	NULL,		11289600,	true},
 	{ "pll_a_out0",	NULL,		11289600,	true},
 	{ "i2s1",	"pll_a_out0",	11289600,	true},
