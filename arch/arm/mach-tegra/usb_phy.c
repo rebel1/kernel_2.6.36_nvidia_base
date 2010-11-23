@@ -116,6 +116,7 @@
 
 #define UTMIP_TX_CFG0		0x820
 #define   UTMIP_FS_PREABMLE_J		(1 << 19)
+#define   UTMIP_HS_DISCON_DISABLE	(1 << 8)
 
 #define UTMIP_MISC_CFG0		0x824
 #define   UTMIP_SUSPEND_EXIT_ON_EDGE	(1 << 22)
@@ -501,6 +502,26 @@ static void utmi_phy_power_off(struct tegra_usb_phy *phy)
 	utmip_pad_power_off(phy);
 }
 
+static void utmi_phy_preresume(struct tegra_usb_phy *phy)
+{
+	unsigned long val;
+	void __iomem *base = phy->regs;
+
+	val = readl(base + UTMIP_TX_CFG0);
+	val |= UTMIP_HS_DISCON_DISABLE;
+	writel(val, base + UTMIP_TX_CFG0);
+}
+
+static void utmi_phy_postresume(struct tegra_usb_phy *phy)
+{
+	unsigned long val;
+	void __iomem *base = phy->regs;
+
+	val = readl(base + UTMIP_TX_CFG0);
+	val &= ~UTMIP_HS_DISCON_DISABLE;
+	writel(val, base + UTMIP_TX_CFG0);
+}
+
 static void ulpi_viewport_write(struct tegra_usb_phy *phy, u8 addr, u8 data)
 {
 	unsigned long val;
@@ -689,6 +710,20 @@ int tegra_usb_phy_power_off(struct tegra_usb_phy *phy)
 	else
 		utmi_phy_power_off(phy);
 
+	return 0;
+}
+
+int tegra_usb_phy_preresume(struct tegra_usb_phy *phy)
+{
+	if (phy->instance == 2)
+		utmi_phy_preresume(phy);
+	return 0;
+}
+
+int tegra_usb_phy_postresume(struct tegra_usb_phy *phy)
+{
+	if (phy->instance == 2)
+		utmi_phy_postresume(phy);
 	return 0;
 }
 
