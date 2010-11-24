@@ -178,8 +178,9 @@ static void run_handlers(struct list_head completed[NVHOST_INTR_ACTION_COUNT])
 		list_for_each_entry_safe(waiter, next, head, list) {
 			list_del(&waiter->list);
 			handler(waiter);
-			atomic_set(&waiter->state, WLS_HANDLED);
-			smp_wmb();
+			if (atomic_cmpxchg(&waiter->state, WLS_REMOVED,
+				WLS_HANDLED) != WLS_REMOVED)
+					BUG();
 			kref_put(&waiter->refcount, waiter_release);
 		}
 	}
@@ -418,9 +419,24 @@ void nvhost_intr_deinit(struct nvhost_intr *intr)
 
 	for (id = 0, syncpt = intr->syncpt;
 	     id < NV_HOST1X_SYNCPT_NB_PTS;
-	     ++id, ++syncpt)
+	     ++id, ++syncpt) {
+		struct nvhost_waitlist *waiter, *next;
+		list_for_each_entry_safe(waiter, next, &syncpt->wait_head, list) {
+			if (atomic_cmpxchg(&waiter->state, WLS_CANCELLED, WLS_HANDLED)
+				== WLS_CANCELLED) {
+				list_del(&waiter->list);
+				kref_put(&waiter->refcount, waiter_release);
+			}
+		}
+
+		if (!list_empty(&syncpt->wait_head)) {  /* output diagnostics */
+			printk("%s id=%d\n",__func__,id);
+			BUG_ON(1);
+		}
+
 		if (syncpt->irq_requested)
 			free_irq(syncpt->irq, syncpt);
+	}
 
 	if (intr->host1x_isr_started) {
 		free_irq(intr->host1x_irq, intr);
@@ -432,7 +448,7 @@ void nvhost_intr_configure (struct nvhost_intr *intr, u32 hz)
 {
 	void __iomem *sync_regs = intr_to_dev(intr)->sync_aperture;
 
-	// write microsecond clock register
+	/* write microsecond clock register */
 	writel((hz + 1000000 - 1)/1000000, sync_regs + HOST1X_SYNC_USEC_CLK);
 
 	/* disable the ip_busy_timeout. this prevents write drops, etc.
