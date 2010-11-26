@@ -418,6 +418,7 @@ static int tegra_ehci_setup(struct usb_hcd *hcd)
 	return retval;
 }
 
+#ifdef CONFIG_PM
 static int tegra_ehci_bus_suspend(struct usb_hcd *hcd)
 {
 	struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
@@ -445,6 +446,7 @@ static int tegra_ehci_bus_resume(struct usb_hcd *hcd)
 	tegra->port_resuming = 1;
 	return ehci_bus_resume(hcd);
 }
+#endif
 
 static const struct hc_driver tegra_ehci_hc_driver = {
 	.description		= hcd_name,

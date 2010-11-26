@@ -310,7 +310,7 @@ static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_otg_device,
 	&androidusb_device,
 	&debug_uart,
-	&tegra_uart2_device,
+	&tegra_uartc_device,
 	&pmu_device,
 	&tegra_udc_device,
 	&tegra_ehci2_device,
