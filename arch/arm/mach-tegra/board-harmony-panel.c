@@ -21,21 +21,27 @@
 #include <mach/iomap.h>
 #include <mach/tegra_fb.h>
 
+#define FBMEM_BASE 0x1c012000
+#define FBMEM_SIZE 0x500000
+
 /* Framebuffer */
 static struct resource fb_resource[] = {
 	[0] = {
+		.name   = "irq",
 		.start  = INT_DISPLAY_GENERAL,
 		.end    = INT_DISPLAY_GENERAL,
 		.flags  = IORESOURCE_IRQ,
 	},
 	[1] = {
+		.name   = "regs",
 		.start	= TEGRA_DISPLAY_BASE,
 		.end	= TEGRA_DISPLAY_BASE + TEGRA_DISPLAY_SIZE-1,
 		.flags	= IORESOURCE_MEM,
 	},
 	[2] = {
-		.start	= 0x1c012000,
-		.end	= 0x1c012000 + 0x500000 - 1,
+		.name   = "fbmem",
+		.start	= FBMEM_BASE,
+		.end	= FBMEM_BASE + FBMEM_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 };
