@@ -267,10 +267,10 @@ static void ventana_i2c_init(void)
 
 	i2c_register_board_info(0, ventana_i2c_bus1_board_info, 1);
 
-	platform_device_register(&tegra_i2c_device4);
-	platform_device_register(&tegra_i2c_device3);
-	platform_device_register(&tegra_i2c_device2);
 	platform_device_register(&tegra_i2c_device1);
+	platform_device_register(&tegra_i2c_device2);
+	platform_device_register(&tegra_i2c_device3);
+	platform_device_register(&tegra_i2c_device4);
 }
 
 #define GPIO_KEY(_id, _gpio, _iswake)		\
