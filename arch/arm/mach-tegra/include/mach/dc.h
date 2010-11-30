@@ -44,6 +44,23 @@ enum {
 	TEGRA_DC_OUT_HDMI,
 };
 
+struct tegra_dc_out_pin {
+	int     name;
+	int     pol;
+};
+
+enum {
+	TEGRA_DC_OUT_PIN_DATA_ENABLE,
+	TEGRA_DC_OUT_PIN_H_SYNC,
+	TEGRA_DC_OUT_PIN_V_SYNC,
+	TEGRA_DC_OUT_PIN_PIXEL_CLOCK,
+};
+
+enum {
+	TEGRA_DC_OUT_PIN_POL_LOW,
+	TEGRA_DC_OUT_PIN_POL_HIGH,
+};
+
 struct tegra_dc_out {
 	int			type;
 	unsigned		flags;
@@ -61,6 +78,9 @@ struct tegra_dc_out {
 
 	struct tegra_dc_mode	*modes;
 	int			n_modes;
+
+	struct tegra_dc_out_pin	*out_pins;
+	unsigned		n_out_pins;
 
 	int	(*enable)(void);
 	int	(*disable)(void);
