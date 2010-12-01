@@ -21,7 +21,13 @@
 #include <linux/i2c.h>
 #include <mach/gpio.h>
 #include <linux/i2c/nct1008.h>
+
+#ifdef CONFIG_SENSORS_AK8975
 #include <linux/akm8975.h>
+#endif
+#ifdef CONFIG_SENSORS_MPU3050
+#include <linux/mpu3050.h>
+#endif
 
 #include "gpio-names.h"
 #include <linux/i2c/pca954x.h>
@@ -29,7 +35,10 @@
 #include <media/ov5650.h>
 
 #define ISL29018_IRQ_GPIO	TEGRA_GPIO_PZ2
+
+#ifdef CONFIG_SENSORS_AK8975
 #define AKM8975_IRQ_GPIO	TEGRA_GPIO_PN5
+#endif
 
 #define CAMERA_POWER_GPIO	TEGRA_GPIO_PV4
 #define CAMERA_CSI_MUX_SEL_GPIO	TEGRA_GPIO_PBB4
@@ -73,12 +82,14 @@ static void ventana_isl29018_init(void)
 	gpio_direction_input(ISL29018_IRQ_GPIO);
 }
 
+#ifdef CONFIG_SENSORS_AK8975
 static void ventana_akm8975_init(void)
 {
 	tegra_gpio_enable(AKM8975_IRQ_GPIO);
 	gpio_request(AKM8975_IRQ_GPIO, "akm8975");
 	gpio_direction_input(AKM8975_IRQ_GPIO);
 }
+#endif
 
 static void ventana_bq20z75_init(void)
 {
@@ -118,7 +129,7 @@ static struct pca954x_platform_mode ventana_pca9546_modes[] = {
 };
 
 static struct pca954x_platform_data ventana_pca9546_data = {
-	.modes          = ventana_pca9546_modes,
+	.modes	  = ventana_pca9546_modes,
 	.num_modes      = ARRAY_SIZE(ventana_pca9546_modes),
 };
 
@@ -138,10 +149,13 @@ static struct i2c_board_info ventana_i2c4_board_info[] = {
 		I2C_BOARD_INFO("nct1008", 0x4C),
 		.platform_data = &ventana_nct1008_pdata,
 	},
+
+#ifdef CONFIG_SENSORS_AK8975
 	{
 		I2C_BOARD_INFO("akm8975", 0x0C),
 		.irq = TEGRA_GPIO_TO_IRQ(AKM8975_IRQ_GPIO),
 	},
+#endif
 };
 
 static struct i2c_board_info ventana_i2c7_board_info[] = {
@@ -151,10 +165,50 @@ static struct i2c_board_info ventana_i2c7_board_info[] = {
 	},
 };
 
+#ifdef CONFIG_SENSORS_MPU3050
+static struct mpu3050_platform_data mpu3050_data = {
+	.int_config  = 0x10,
+	.orientation = { 0, -1, 0, -1, 0, 0, 0, 0, -1 },  /* Orientation matrix for MPU on ventana */
+	.level_shifter = 0,
+	.accel = {
+#ifdef CONFIG_SENSORS_KXTF9_MPU
+	.get_slave_descr = kxtf9_get_slave_descr,
+#else
+	.get_slave_descr = NULL,
+#endif
+	.adapt_num   = 0,
+	.bus         = EXT_SLAVE_BUS_SECONDARY,
+	.address     = 0x0F,
+	.orientation = { 0, -1, 0, -1, 0, 0, 0, 0, -1 },  /* Orientation matrix for Kionix on ventana */
+	},
+
+	.compass = {
+#ifdef CONFIG_SENSORS_AK8975_MPU
+	.get_slave_descr = ak8975_get_slave_descr,
+#else
+	.get_slave_descr = NULL,
+#endif
+	.adapt_num   = 3,            /* bus number 3 on ventana */
+	.bus         = EXT_SLAVE_BUS_PRIMARY,
+	.address     = 0x0C,
+	.orientation = { 1, 0, 0, 0, -1, 0, 0, 0, -1 },  /* Orientation matrix for AKM on ventana */
+	},
+};
+
+static struct i2c_board_info __initdata mpu3050_i2c0_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("mpu3050", 0x68), /*.irq = 299,*/
+		.platform_data = &mpu3050_data,
+	},
+};
+#endif
+
 int __init ventana_sensors_init(void)
 {
 	ventana_isl29018_init();
+#ifdef CONFIG_SENSORS_AK8975
 	ventana_akm8975_init();
+#endif
 	ventana_camera_init();
 	ventana_bq20z75_init();
 
@@ -172,6 +226,10 @@ int __init ventana_sensors_init(void)
 
 	i2c_register_board_info(7, ventana_i2c7_board_info,
 		ARRAY_SIZE(ventana_i2c7_board_info));
+
+#ifdef CONFIG_SENSORS_MPU3050
+	i2c_register_board_info(0, mpu3050_i2c0_boardinfo, ARRAY_SIZE(mpu3050_i2c0_boardinfo));
+#endif
 
 	return 0;
 }
