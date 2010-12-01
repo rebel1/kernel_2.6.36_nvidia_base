@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.36
-# Wed Dec  8 17:57:53 2010
+# Fri Dec 10 10:54:49 2010
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -918,7 +918,7 @@ CONFIG_KERNEL_DEBUGGER_CORE=y
 # CONFIG_SENSORS_TSL2550 is not set
 # CONFIG_SENSORS_BH1780 is not set
 # CONFIG_HMC6352 is not set
-CONFIG_SENSORS_AK8975=y
+# CONFIG_SENSORS_AK8975 is not set
 # CONFIG_DS1682 is not set
 # CONFIG_TI_DAC7512 is not set
 # CONFIG_UID_STAT is not set
@@ -937,6 +937,16 @@ CONFIG_BCM4329_RFKILL=y
 # CONFIG_EEPROM_MAX6875 is not set
 # CONFIG_EEPROM_93CX6 is not set
 # CONFIG_IWMC3200TOP is not set
+
+#
+# Motion Sensors Support
+#
+CONFIG_SENSORS_MPU3050=y
+# CONFIG_SENSORS_MPU3050_DEBUG is not set
+# CONFIG_SENSORS_ACCELEROMETER_NONE is not set
+CONFIG_SENSORS_KXTF9_MPU=y
+# CONFIG_SENSORS_COMPASS_NONE is not set
+CONFIG_SENSORS_AK8975_MPU=y
 CONFIG_HAVE_IDE=y
 # CONFIG_IDE is not set
 
