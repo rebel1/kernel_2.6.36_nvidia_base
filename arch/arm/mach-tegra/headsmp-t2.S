@@ -1,7 +1,7 @@
 /*
- * arch/arm/mach-tegra/headsmp.S
+ * arch/arm/mach-tegra/headsmp-t2.S
  *
- * SMP initialization routines for Tegra SoCs
+ * SMP initialization routines for Tegra2 SoCs
  *
  * Copyright (c) 2009-2010, NVIDIA Corporation.
  *
@@ -37,9 +37,7 @@
 
 #define PMC_DPD_SAMPLE	0x20
 #define PMC_DPD_ENABLE	0x24
-#define PMC_SCRATCH1	0x54
 #define PMC_SCRATCH39	0x138
-#define RST_DEVICES_U	0xc
 
 #define CLK_RESET_PLLX_BASE     0xe0
 #define CLK_RESET_PLLX_MISC     0xe4
@@ -49,28 +47,6 @@
 #define CLK_RESET_PLLP_MISC     0xac
 
 /*        .section ".cpuinit.text", "ax"*/
-
-.macro	poke_ev, val, tmp
-	mov32	\tmp, (TEGRA_EXCEPTION_VECTORS_BASE + 0x100)
-	str	\val, [\tmp]
-.endm
-
-#ifdef CONFIG_SMP
-/*
- *	tegra_secondary_startup
- *
- *	 Initial secondary processor boot vector; jumps to kernel's
- *	 secondary_startup routine
- */
-ENTRY(tegra_secondary_startup)
-	msr	cpsr_fsxc, #0xd3
-	bl	__invalidate_cpu_state
-	cpu_id	r0
-	enable_coresite r1
-	poke_ev	r0, r1
-	b	secondary_startup
-ENDPROC(tegra_secondary_startup)
-#endif
 
 /*
  *	__restart_plls
@@ -108,30 +84,8 @@ __restart_plls:
 	/* FIXME: need to record actual power transition here */
 	mov	r0, #0
 	b	__cortex_a9_l2x0_restart
-ENDPROC(__restart_pllx)
-/*
- *	__enable_coresite_access
- *
- *	  Takes the coresite debug interface out of reset, enables
- *	  access to all CPUs. Called with MMU disabled.
- */
-	.align L1_CACHE_SHIFT
-__enable_coresite_access:
-	mov32	r0, (TEGRA_CLK_RESET_BASE + RST_DEVICES_U)
-	mov32	r2, (TEGRA_TMRUS_BASE)
+ENDPROC(__restart_plls)
 
-	/* assert reset for 2usec */
-	ldr	r1, [r0]
-	orr	r1, #(1<<9)
-	str	r1, [r0]
-	wait_for_us r3, r2, r4
-	add	r3, r3, #2
-	bic	r1, r1, #(1<<9)
-	wait_until r3, r2, r4
-	str	r1, [r0]
-	enable_coresite r3
-	bx	lr
-ENDPROC(__enable_coresite_access)
 /*
  *	tegra_lp2_startup
  *
