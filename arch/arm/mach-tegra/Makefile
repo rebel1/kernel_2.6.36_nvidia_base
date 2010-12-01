@@ -33,7 +33,6 @@ obj-$(CONFIG_CPU_V7)                    += cortex-a9.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += pinmux-t2-tables.o
 obj-$(CONFIG_SMP)                       += localtimer.o
 obj-$(CONFIG_SMP)                       += platsmp.o
-obj-y                                   += headsmp.o
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += headsmp-t2.o
 obj-$(CONFIG_TEGRA_SYSTEM_DMA)          += dma.o
 obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
