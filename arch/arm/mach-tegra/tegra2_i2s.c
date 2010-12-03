@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-tegra/i2s.c
+ * arch/arm/mach-tegra/tegra2_i2s.c
  *
  * Copyright (C) 2010 Google, Inc.
  *
@@ -23,7 +23,7 @@
 #include "clock.h"
 #include <asm/io.h>
 #include <mach/iomap.h>
-#include <mach/i2s_api.h>
+#include <mach/tegra2_i2s.h>
 
 
 #define NR_I2S_IFC	2

@@ -13,7 +13,7 @@ obj-y                                   += powergate.o
 obj-y                                   += suspend.o
 obj-y                                   += fuse.o
 ifeq ($(CONFIG_TEGRA_ALSA),y)
-obj-y                                   += i2s_api.o
+obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_i2s.o
 else
 obj-y                                   += tegra_i2s_audio.o
 endif

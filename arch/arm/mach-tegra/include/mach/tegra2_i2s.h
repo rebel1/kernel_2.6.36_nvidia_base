@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-tegra/include/mach/i2s.h
+ * arch/arm/mach-tegra/include/mach/tegra2_i2s.h
  *
  * Copyright (C) 2010 Google, Inc.
  *

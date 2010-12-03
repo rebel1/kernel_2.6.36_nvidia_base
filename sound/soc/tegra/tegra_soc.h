@@ -34,7 +34,7 @@
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
 #include <mach/iomap.h>
-#include <mach/i2s_api.h>
+#include <mach/tegra2_i2s.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
 #include <mach/audio.h>
