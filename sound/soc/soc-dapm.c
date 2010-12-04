@@ -152,6 +152,10 @@ static int snd_soc_dapm_set_bias_level(struct snd_soc_device *socdev,
 		else
 			codec->bias_level = level;
 	}
+	if (ret == 0) {
+		if (card && card->set_bias_level_post)
+			ret = card->set_bias_level_post(card, level);
+	}
 
 	return ret;
 }
