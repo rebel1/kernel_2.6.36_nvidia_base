@@ -28,6 +28,10 @@
 #include <linux/power_supply.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
+#include <linux/jiffies.h>
+#include <linux/interrupt.h>
+
+#include <mach/gpio.h>
 
 enum {
 	REG_MANUFACTURER_DATA,
@@ -56,6 +60,8 @@ enum {
 #define BATTERY_FULL_CHARGED		0x20
 #define BATTERY_FULL_DISCHARGED		0x10
 
+#define BATTERY_POLL_PERIOD		30000
+
 #define BQ20Z75_DATA(_psp, _addr, _min_value, _max_value)	\
 	{							\
 		.psp = POWER_SUPPLY_PROP_##_psp,		\
@@ -82,7 +88,7 @@ static struct bq20z75_device_data {
 	[REG_SERIAL_NUMBER]     = BQ20Z75_DATA(SERIAL_NUMBER, 0x1C, 0, 65535),
 };
 
-static enum power_supply_property bq20z75_properties[] = {
+static enum power_supply_property bq20z75_battery_properties[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_HEALTH,
 	POWER_SUPPLY_PROP_PRESENT,
@@ -97,20 +103,71 @@ static enum power_supply_property bq20z75_properties[] = {
 	POWER_SUPPLY_PROP_SERIAL_NUMBER
 };
 
-static int bq20z75_get_property(struct power_supply *psy,
+static enum power_supply_property bq20z75_ac_properties[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+};
+
+static char *power_supplied_to[] = {
+	"battery",
+};
+
+static int bq20z75_bat_get_property(struct power_supply *psy,
+	enum power_supply_property psp, union power_supply_propval *val);
+static int bq20z75_ac_get_property(struct power_supply *psy,
 	enum power_supply_property psp, union power_supply_propval *val);
 
-static struct power_supply bq20z75_supply = {
-	.name		= "battery",
-	.type		= POWER_SUPPLY_TYPE_BATTERY,
-	.properties	= bq20z75_properties,
-	.num_properties	= ARRAY_SIZE(bq20z75_properties),
-	.get_property	= bq20z75_get_property,
+enum supply_type {
+	SUPPLY_TYPE_BATTERY = 0,
+	SUPPLY_TYPE_AC,
+};
+
+static struct power_supply bq20z75_supply[] = {
+	[SUPPLY_TYPE_BATTERY] = {
+		.name		= "battery",
+		.type		= POWER_SUPPLY_TYPE_BATTERY,
+		.properties	= bq20z75_battery_properties,
+		.num_properties	= ARRAY_SIZE(bq20z75_battery_properties),
+		.get_property	= bq20z75_bat_get_property,
+	},
+	[SUPPLY_TYPE_AC] = {
+		.name = "ac",
+		.type = POWER_SUPPLY_TYPE_MAINS,
+		.supplied_to = power_supplied_to,
+		.num_supplicants = ARRAY_SIZE(power_supplied_to),
+		.properties = bq20z75_ac_properties,
+		.num_properties = ARRAY_SIZE(bq20z75_ac_properties),
+		.get_property = bq20z75_ac_get_property,
+	},
 };
 
 static struct bq20z75_device_info {
+	struct timer_list	battery_poll_timer;
 	struct i2c_client	*client;
+	int irq;
 } *bq20z75_device;
+
+static int bq20z75_get_ac_status(void)
+{
+	int charger_gpio = irq_to_gpio(bq20z75_device->irq);
+	return !gpio_get_value(charger_gpio);
+}
+
+static int bq20z75_ac_get_property(struct power_supply *psy,
+	enum power_supply_property psp,
+	union power_supply_propval *val)
+{
+	switch (psp) {
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = bq20z75_get_ac_status();
+		break;
+	default:
+		dev_err(&bq20z75_device->client->dev,
+			"%s: INVALID property\n", __func__);
+		return -EINVAL;
+	}
+
+	return 0;
+}
 
 static int bq20z75_get_health(enum power_supply_property psp,
 	union power_supply_propval *val)
@@ -174,6 +231,7 @@ static int bq20z75_get_psp(int reg_offset, enum power_supply_property psp,
 	union power_supply_propval *val)
 {
 	s32 ret;
+	int ac_status;
 
 recheck:
 	ret = i2c_smbus_read_word_data(bq20z75_device->client,
@@ -204,14 +262,13 @@ recheck:
 			while (!(ret & BATTERY_INIT_DONE))
 				goto recheck;
 
-			if (ret & BATTERY_DISCHARGING)
-				val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-			else if (ret & BATTERY_FULL_CHARGED)
+			ac_status = bq20z75_get_ac_status();
+			val->intval = ac_status ?
+				POWER_SUPPLY_STATUS_CHARGING :
+				POWER_SUPPLY_STATUS_DISCHARGING;
+
+			if (ret & BATTERY_FULL_CHARGED)
 				val->intval = POWER_SUPPLY_STATUS_FULL;
-			else if (ret & BATTERY_FULL_DISCHARGED)
-				val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-			else if (!(ret & BATTERY_DISCHARGING))
-				val->intval = POWER_SUPPLY_STATUS_CHARGING;
 		}
 		/* bq20z75 provides battery tempreture in 0.1°K
 		 * so convert it to °C */
@@ -261,7 +318,7 @@ static int bq20z75_get_battery_serial_number(union power_supply_propval *val)
 	return 0;
 }
 
-static int bq20z75_get_property(struct power_supply *psy,
+static int bq20z75_bat_get_property(struct power_supply *psy,
 	enum power_supply_property psp,
 	union power_supply_propval *val)
 {
@@ -313,10 +370,26 @@ static int bq20z75_get_property(struct power_supply *psy,
 	return 0;
 }
 
+static irqreturn_t ac_present_irq(int irq, void *data)
+{
+	power_supply_changed(&bq20z75_supply[SUPPLY_TYPE_AC]);
+	power_supply_changed(&bq20z75_supply[SUPPLY_TYPE_BATTERY]);
+	return IRQ_HANDLED;
+}
+
+static void battery_poll_timer_func(unsigned long unused)
+{
+	power_supply_changed(&bq20z75_supply[SUPPLY_TYPE_BATTERY]);
+	power_supply_changed(&bq20z75_supply[SUPPLY_TYPE_AC]);
+	mod_timer(&bq20z75_device->battery_poll_timer,
+		jiffies + msecs_to_jiffies(BATTERY_POLL_PERIOD));
+}
+
 static int bq20z75_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
 	int rc;
+	int i;
 
 	bq20z75_device = kzalloc(sizeof(*bq20z75_device), GFP_KERNEL);
 	if (!bq20z75_device)
@@ -325,28 +398,56 @@ static int bq20z75_probe(struct i2c_client *client,
 	memset(bq20z75_device, 0, sizeof(*bq20z75_device));
 
 	bq20z75_device->client = client;
+	bq20z75_device->irq = client->irq;
 	i2c_set_clientdata(client, bq20z75_device);
 
-	rc = power_supply_register(&client->dev, &bq20z75_supply);
-	if (rc) {
+	rc = request_threaded_irq(bq20z75_device->irq, NULL,
+		ac_present_irq,
+		IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+		"ac_present", bq20z75_device);
+	if (rc < 0) {
 		dev_err(&bq20z75_device->client->dev,
-			"%s: Failed to register power supply\n", __func__);
-		kfree(bq20z75_device);
-		return rc;
+			"%s: request_irq failed(%d)\n", __func__, rc);
+		goto fail_irq;
 	}
 
-	dev_info(&bq20z75_device->client->dev,
-		"%s: battery driver registered\n", client->name);
+	for (i = 0; i < ARRAY_SIZE(bq20z75_supply); i++) {
+		rc = power_supply_register(&client->dev, &bq20z75_supply[i]);
+		if (rc) {
+			dev_err(&bq20z75_device->client->dev,
+				"%s: Failed to register power supply\n", __func__);
+			goto fail_power_register;
+		}
+	}
 
+	setup_timer(&bq20z75_device->battery_poll_timer,
+		battery_poll_timer_func, 0);
+	mod_timer(&bq20z75_device->battery_poll_timer,
+		jiffies + msecs_to_jiffies(BATTERY_POLL_PERIOD));
+
+	dev_info(&bq20z75_device->client->dev, "driver registered\n");
 	return 0;
+
+fail_power_register:
+	while (i--)
+		power_supply_unregister(&bq20z75_supply[i]);
+	free_irq(bq20z75_device->irq, bq20z75_device);
+fail_irq:
+	kfree(bq20z75_device);
+	return rc;
 }
 
 static int bq20z75_remove(struct i2c_client *client)
 {
 	struct bq20z75_device_info *bq20z75_device;
+	int i;
 
 	bq20z75_device = i2c_get_clientdata(client);
-	power_supply_unregister(&bq20z75_supply);
+	del_timer_sync(&bq20z75_device->battery_poll_timer);
+
+	for (i = 0; i < ARRAY_SIZE(bq20z75_supply); i++)
+		power_supply_unregister(&bq20z75_supply[i]);
+
 	kfree(bq20z75_device);
 
 	return 0;
@@ -360,6 +461,7 @@ static int bq20z75_suspend(struct i2c_client *client,
 	struct bq20z75_device_info *bq20z75_device;
 
 	bq20z75_device = i2c_get_clientdata(client);
+	del_timer_sync(&bq20z75_device->battery_poll_timer);
 
 	/* write to manufacture access with sleep command */
 	ret = i2c_smbus_write_word_data(bq20z75_device->client,
@@ -378,6 +480,10 @@ static int bq20z75_suspend(struct i2c_client *client,
 /* any smbus transaction will wake up bq20z75 */
 static int bq20z75_resume(struct i2c_client *client)
 {
+	setup_timer(&bq20z75_device->battery_poll_timer,
+		battery_poll_timer_func, 0);
+	mod_timer(&bq20z75_device->battery_poll_timer,
+		jiffies + msecs_to_jiffies(BATTERY_POLL_PERIOD));
 	return 0;
 }
 #endif
