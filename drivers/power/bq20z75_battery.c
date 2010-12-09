@@ -388,8 +388,8 @@ static void battery_poll_timer_func(unsigned long unused)
 static int bq20z75_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
-	int rc;
-	int i;
+	int rc, i, flags;
+	int supply_index = SUPPLY_TYPE_BATTERY;
 
 	bq20z75_device = kzalloc(sizeof(*bq20z75_device), GFP_KERNEL);
 	if (!bq20z75_device)
@@ -398,6 +398,18 @@ static int bq20z75_probe(struct i2c_client *client,
 	memset(bq20z75_device, 0, sizeof(*bq20z75_device));
 
 	bq20z75_device->client = client;
+	flags = bq20z75_device->client->flags;
+	bq20z75_device->client->flags &= ~I2C_M_IGNORE_NAK;
+
+	rc = i2c_smbus_read_word_data(bq20z75_device->client,
+		bq20z75_data[REG_SERIAL_NUMBER].addr);
+	if (rc < 0) {
+		dev_err(&bq20z75_device->client->dev,
+			"%s: no battery present(%d)\n", __func__, rc);
+		supply_index = SUPPLY_TYPE_AC;
+	}
+
+	bq20z75_device->client->flags = flags;
 	bq20z75_device->irq = client->irq;
 	i2c_set_clientdata(client, bq20z75_device);
 
@@ -411,11 +423,13 @@ static int bq20z75_probe(struct i2c_client *client,
 		goto fail_irq;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(bq20z75_supply); i++) {
-		rc = power_supply_register(&client->dev, &bq20z75_supply[i]);
+	for (i = supply_index; i < ARRAY_SIZE(bq20z75_supply); i++) {
+		rc = power_supply_register(&client->dev,
+			&bq20z75_supply[i]);
 		if (rc) {
 			dev_err(&bq20z75_device->client->dev,
-				"%s: Failed to register power supply\n", __func__);
+				"%s: Failed to register power supply\n",
+				 __func__);
 			goto fail_power_register;
 		}
 	}
