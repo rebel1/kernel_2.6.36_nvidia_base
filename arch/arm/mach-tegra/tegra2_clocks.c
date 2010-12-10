@@ -32,6 +32,7 @@
 
 #include "clock.h"
 #include "fuse.h"
+#include "tegra2_emc.h"
 
 #define RST_DEVICES			0x004
 #define RST_DEVICES_SET			0x300
@@ -302,8 +303,6 @@ static void tegra2_super_clk_init(struct clk *c)
 	}
 	BUG_ON(sel->input == NULL);
 	c->parent = sel->input;
-
-	INIT_LIST_HEAD(&c->u.shared_bus.list);
 }
 
 static int tegra2_super_clk_enable(struct clk *c)
@@ -1023,6 +1022,53 @@ static struct clk_ops tegra_periph_clk_ops = {
 	.reset			= &tegra2_periph_clk_reset,
 };
 
+/* External memory controller clock ops */
+static void tegra2_emc_clk_init(struct clk *c)
+{
+	tegra2_periph_clk_init(c);
+	c->max_rate = clk_get_rate_locked(c);
+}
+
+static long tegra2_emc_clk_round_rate(struct clk *c, unsigned long rate)
+{
+	long new_rate = rate;
+
+	new_rate = tegra_emc_round_rate(new_rate);
+	if (new_rate < 0)
+		return c->max_rate;
+
+	BUG_ON(new_rate != tegra2_periph_clk_round_rate(c, new_rate));
+
+	return new_rate;
+}
+
+static int tegra2_emc_clk_set_rate(struct clk *c, unsigned long rate)
+{
+	int ret;
+	/* The Tegra2 memory controller has an interlock with the clock
+	 * block that allows memory shadowed registers to be updated,
+	 * and then transfer them to the main registers at the same
+	 * time as the clock update without glitches. */
+	ret = tegra_emc_set_rate(rate);
+	if (ret < 0)
+		return ret;
+
+	ret = tegra2_periph_clk_set_rate(c, rate);
+	udelay(1);
+
+	return ret;
+}
+
+static struct clk_ops tegra_emc_clk_ops = {
+	.init			= &tegra2_emc_clk_init,
+	.enable			= &tegra2_periph_clk_enable,
+	.disable		= &tegra2_periph_clk_disable,
+	.set_parent		= &tegra2_periph_clk_set_parent,
+	.set_rate		= &tegra2_emc_clk_set_rate,
+	.round_rate		= &tegra2_emc_clk_round_rate,
+	.reset			= &tegra2_periph_clk_reset,
+};
+
 /* Clock doubler ops */
 static void tegra2_clk_double_init(struct clk *c)
 {
@@ -1151,15 +1197,16 @@ static struct clk_ops tegra_cdev_clk_ops = {
 static void tegra_clk_shared_bus_update(struct clk *bus)
 {
 	struct clk *c;
-	unsigned long rate = bus->u.shared_bus.min_rate;
+	unsigned long rate = bus->min_rate;
 
-	list_for_each_entry(c, &bus->u.shared_bus.list,
+	list_for_each_entry(c, &bus->shared_bus_list,
 			u.shared_bus_user.node) {
 		if (c->u.shared_bus_user.enabled)
 			rate = max(c->u.shared_bus_user.rate, rate);
 	}
 
-	clk_set_rate(bus, rate);
+	if (rate != clk_get_rate(bus))
+		clk_set_rate(bus, rate);
 };
 
 static void tegra_clk_shared_bus_init(struct clk *c)
@@ -1170,7 +1217,7 @@ static void tegra_clk_shared_bus_init(struct clk *c)
 	c->set = true;
 
 	list_add_tail(&c->u.shared_bus_user.node,
-		&c->parent->u.shared_bus.list);
+		&c->parent->shared_bus_list);
 }
 
 static int tegra_clk_shared_bus_set_rate(struct clk *c, unsigned long rate)
@@ -1716,9 +1763,7 @@ static struct clk tegra_clk_sclk = {
 	.reg	= 0x28,
 	.ops	= &tegra_super_ops,
 	.max_rate = 240000000,
-	.u.shared_bus = {
-		.min_rate = 120000000,
-	},
+	.min_rate = 120000000,
 };
 
 static struct clk tegra_clk_virtual_cpu = {
@@ -1843,6 +1888,18 @@ static struct clk_mux_sel mux_clk_32k[] = {
 	{ 0, 0},
 };
 
+static struct clk tegra_clk_emc = {
+	.name = "emc",
+	.ops = &tegra_emc_clk_ops,
+	.reg = 0x19c,
+	.max_rate = 800000000,
+	.inputs = mux_pllm_pllc_pllp_clkm,
+	.flags = MUX | DIV_U71 | PERIPH_EMC_ENB,
+	.u.periph = {
+		.clk_num = 57,
+	},
+};
+
 #define PERIPH_CLK(_name, _dev, _con, _clk_num, _reg, _max, _inputs, _flags) \
 	{						\
 		.name      = _name,			\
@@ -1931,13 +1988,17 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("usbd",	"fsl-tegra-udc",	NULL,	22,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb2",	"tegra-ehci.1",		NULL,	58,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
 	PERIPH_CLK("usb3",	"tegra-ehci.2",		NULL,	59,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
-	PERIPH_CLK("emc",	"emc",			NULL,	57,	0x19c,	800000000, mux_pllm_pllc_pllp_clkm,	MUX | DIV_U71 | PERIPH_EMC_ENB),
 	PERIPH_CLK("dsi",	"dsi",			NULL,	48,	0,	500000000, mux_plld,			0), /* scales with voltage */
 	PERIPH_CLK("csi",	"tegra_camera",		"csi",	52,	0,	72000000,  mux_pllp_out3,		0),
 	PERIPH_CLK("isp",	"tegra_camera",		"isp",	23,	0,	150000000, mux_clk_m,			0), /* same frequency as VI */
 	PERIPH_CLK("csus",	"tegra_camera",		"csus",	92,	0,	150000000, mux_clk_m,			PERIPH_NO_RESET),
 
 	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_sclk),
+	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc),
+	SHARED_CLK("cpu.emc",	"cpu",			"emc",	&tegra_clk_emc),
+	SHARED_CLK("disp1.emc",	"tegradc.0",		"emc",	&tegra_clk_emc),
+	SHARED_CLK("disp2.emc",	"tegradc.1",		"emc",	&tegra_clk_emc),
+	SHARED_CLK("hdmi.emc",	"hdmi",			"emc",	&tegra_clk_emc),
 };
 
 #define CLK_DUPLICATE(_name, _dev, _con)		\
@@ -2012,11 +2073,13 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_clk_virtual_cpu,
 	&tegra_clk_blink,
 	&tegra_clk_cop,
+	&tegra_clk_emc,
 };
 
 static void tegra2_init_one_clock(struct clk *c)
 {
 	clk_init(c);
+	INIT_LIST_HEAD(&c->shared_bus_list);
 	if (!c->lookup.dev_id && !c->lookup.con_id)
 		c->lookup.con_id = c->name;
 	c->lookup.clk = c;

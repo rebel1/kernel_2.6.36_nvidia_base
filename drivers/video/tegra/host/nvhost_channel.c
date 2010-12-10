@@ -231,12 +231,12 @@ static void power_3d(struct nvhost_module *mod, enum nvhost_power_action action)
 						NVSYNCPT_3D, syncval);
 
 			nvhost_intr_add_action(&ch->dev->intr, NVSYNCPT_3D,
-						syncval,
-						NVHOST_INTR_ACTION_WAKEUP,
-						&wq, &ref);
+					       syncval,
+					       NVHOST_INTR_ACTION_WAKEUP,
+					       &wq, &ref);
 			wait_event(wq,
-					nvhost_syncpt_min_cmp(&ch->dev->syncpt,
-					NVSYNCPT_3D, syncval));
+				   nvhost_syncpt_min_cmp(&ch->dev->syncpt,
+							 NVSYNCPT_3D, syncval));
 			nvhost_intr_put_ref(&ch->dev->intr, ref);
 			nvhost_cdma_update(&ch->cdma);
 		}

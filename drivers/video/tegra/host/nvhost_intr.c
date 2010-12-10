@@ -429,7 +429,7 @@ void nvhost_intr_deinit(struct nvhost_intr *intr)
 			}
 		}
 
-		if (!list_empty(&syncpt->wait_head)) {  /* output diagnostics */
+		if(!list_empty(&syncpt->wait_head)) {  // output diagnostics
 			printk("%s id=%d\n",__func__,id);
 			BUG_ON(1);
 		}
