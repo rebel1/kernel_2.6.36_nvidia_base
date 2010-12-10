@@ -315,6 +315,7 @@ static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_otg_device,
 	&androidusb_device,
 	&debug_uart,
+	&tegra_uartb_device,
 	&tegra_uartc_device,
 	&pmu_device,
 	&tegra_udc_device,
@@ -427,6 +428,18 @@ void tegra_usb_otg_host_unregister(struct platform_device *pdev)
 	platform_device_unregister(pdev);
 }
 
+static int __init ventana_gps_init(void)
+{
+	struct clk *clk32 = clk_get_sys(NULL, "blink");
+	if (!IS_ERR(clk32)) {
+		clk_set_rate(clk32,clk32->parent->rate);
+		clk_enable(clk32);
+	}
+
+	tegra_gpio_enable(TEGRA_GPIO_PZ3);
+	return 0;
+}
+
 static void __init tegra_ventana_init(void)
 {
 	char serial[20];
@@ -449,6 +462,7 @@ static void __init tegra_ventana_init(void)
 	ventana_touch_init();
 	ventana_keys_init();
 	ventana_usb_init();
+	ventana_gps_init();
 	ventana_panel_init();
 	ventana_sensors_init();
 	ventana_bt_rfkill();
