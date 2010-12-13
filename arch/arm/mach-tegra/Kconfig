@@ -29,6 +29,11 @@ config MACH_VENTANA
        help
          Support for NVIDIA Ventana development platform
 
+config MACH_WHISTLER
+       bool "Whistler board"
+       help
+         Support for NVIDIA Whistler development platform
+
 choice
         prompt "Low-level debug console UART"
         default TEGRA_DEBUG_UART_NONE
