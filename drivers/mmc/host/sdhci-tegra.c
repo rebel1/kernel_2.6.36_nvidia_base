@@ -283,6 +283,10 @@ static int tegra_sdhci_suspend(struct platform_device *pdev, pm_message_t state)
 		u16 clk;
 		unsigned int clock = 100000;
 
+		if (device_may_wakeup(&pdev->dev)) {
+		        enable_irq_wake(host->sdhci->irq);
+		}
+
 		/* save interrupt status before suspending */
 		host->sdhci_ints = sdhci_readl(host->sdhci, SDHCI_INT_ENABLE);
 
@@ -319,6 +323,10 @@ static int tegra_sdhci_resume(struct platform_device *pdev)
 
 	if (host->card_always_on && is_card_sdio(host->sdhci->mmc->card)) {
 		int ret = 0;
+
+		if (device_may_wakeup(&pdev->dev)) {
+		        disable_irq_wake(host->sdhci->irq);
+		}
 
 		/* soft reset SD host controller and enable interrupts */
 		ret = tegra_sdhci_restore(host->sdhci);
