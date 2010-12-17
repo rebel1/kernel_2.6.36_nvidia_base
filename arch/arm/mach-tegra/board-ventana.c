@@ -34,6 +34,7 @@
 #include <linux/input.h>
 #include <linux/tegra_usb.h>
 #include <linux/usb/android_composite.h>
+#include <linux/mfd/tps6586x.h>
 
 #ifdef CONFIG_TOUCHSCREEN_PANJIT_I2C
 #include <linux/i2c/panjit_ts.h>
@@ -510,6 +511,22 @@ static int __init ventana_gps_init(void)
 	return 0;
 }
 
+static void ventana_power_off(void)
+{
+	int ret;
+
+	ret = tps6586x_power_off();
+	if (ret)
+		pr_err("ventana: failed to power off\n");
+
+	while(1);
+}
+
+static void __init ventana_power_off_init(void)
+{
+	pm_power_off = ventana_power_off;
+}
+
 static void __init tegra_ventana_init(void)
 {
 	char serial[20];
@@ -549,6 +566,7 @@ static void __init tegra_ventana_init(void)
 	ventana_panel_init();
 	ventana_sensors_init();
 	ventana_bt_rfkill();
+	ventana_power_off_init();
 }
 
 MACHINE_START(VENTANA, "ventana")
