@@ -24,6 +24,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/wakelock.h>
 #include <linux/switch.h>
 #include <linux/workqueue.h>
 
@@ -56,6 +57,8 @@ struct tegra_dc_hdmi_data {
 	struct clk			*disp2_clk;
 
 	struct switch_dev		hpd_switch;
+
+	struct                          wake_lock wake_lock;
 
 	spinlock_t			suspend_lock;
 	bool				suspended;
@@ -619,6 +622,7 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 
 	tegra_dc_set_outdata(dc, hdmi);
 
+	wake_lock_init(&hdmi->wake_lock, WAKE_LOCK_SUSPEND, "HDMI");
 	return 0;
 
 err_free_irq:
@@ -653,6 +657,7 @@ static void tegra_dc_hdmi_destroy(struct tegra_dc *dc)
 	clk_put(hdmi->disp2_clk);
 	tegra_edid_destroy(hdmi->edid);
 
+	wake_lock_destroy(&hdmi->wake_lock);
 	kfree(hdmi);
 
 }
@@ -1093,6 +1098,8 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 	tegra_dc_writel(dc, DISP_CTRL_MODE_C_DISPLAY, DC_CMD_DISPLAY_COMMAND);
 	tegra_dc_writel(dc, GENERAL_ACT_REQ << 8, DC_CMD_STATE_CONTROL);
 	tegra_dc_writel(dc, GENERAL_ACT_REQ, DC_CMD_STATE_CONTROL);
+
+	wake_lock(&hdmi->wake_lock);
 }
 
 static void tegra_dc_hdmi_disable(struct tegra_dc *dc)
@@ -1101,6 +1108,7 @@ static void tegra_dc_hdmi_disable(struct tegra_dc *dc)
 
 	tegra_periph_reset_assert(hdmi->clk);
 	clk_disable(hdmi->clk);
+	wake_unlock(&hdmi->wake_lock);
 }
 struct tegra_dc_out_ops tegra_dc_hdmi_ops = {
 	.init = tegra_dc_hdmi_init,
