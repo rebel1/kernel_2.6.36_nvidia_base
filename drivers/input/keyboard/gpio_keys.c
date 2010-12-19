@@ -601,7 +601,10 @@ static int gpio_keys_resume(struct device *dev)
 		struct gpio_keys_button *button = &pdata->buttons[i];
 		if (button->wakeup && device_may_wakeup(&pdev->dev)) {
 			int irq = gpio_to_irq(button->gpio);
+			unsigned int type = button->type ?: EV_KEY;
 			disable_irq_wake(irq);
+			input_event(ddata->input, type, button->code, 1);
+			input_sync(ddata->input);
 		}
 
 		gpio_keys_report_event(&ddata->data[i]);
