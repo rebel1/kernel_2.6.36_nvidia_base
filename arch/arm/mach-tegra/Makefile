@@ -64,3 +64,4 @@ obj-${CONFIG_MACH_WHISTLER}             += board-whistler-pinmux.o
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler-sdhci.o
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler-power.o
 obj-${CONFIG_MACH_WHISTLER}             += board-whistler-panel.o
+obj-${CONFIG_MACH_WHISTLER}             += board-whistler-kbc.o

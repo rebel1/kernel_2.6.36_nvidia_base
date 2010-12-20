@@ -80,6 +80,7 @@ static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	{ "uarta",	"pll_p",	216000000,	true},
 	{ "pll_m",	"clk_m",	600000000,	true},
 	{ "pwm",	"clk_32k",	32768,		false},
+	{ "kbc",	"clk_32k",	32768,		true},
 	{ NULL,		NULL,		0,		0},
 };
 
@@ -207,6 +208,7 @@ static void __init tegra_whistler_init(void)
 	whistler_regulator_init();
 	whistler_panel_init();
 	whistler_touch_init();
+	whistler_kbc_init();
 }
 
 int __init tegra_whistler_protected_aperture_init(void)
