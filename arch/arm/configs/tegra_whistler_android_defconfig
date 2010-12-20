@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.36
-# Thu Dec 16 19:42:50 2010
+# Mon Dec 20 16:39:50 2010
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -1074,7 +1074,7 @@ CONFIG_KEYBOARD_GPIO=y
 # CONFIG_KEYBOARD_MAX7359 is not set
 # CONFIG_KEYBOARD_MCS is not set
 # CONFIG_KEYBOARD_NEWTON is not set
-# CONFIG_KEYBOARD_TEGRA is not set
+CONFIG_KEYBOARD_TEGRA=y
 # CONFIG_KEYBOARD_OPENCORES is not set
 # CONFIG_KEYBOARD_STOWAWAY is not set
 # CONFIG_KEYBOARD_SUNKBD is not set
