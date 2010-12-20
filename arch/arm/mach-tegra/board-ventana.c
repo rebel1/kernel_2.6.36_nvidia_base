@@ -533,7 +533,7 @@ static void __init tegra_ventana_init(void)
 	tegra_common_init();
 	tegra_clk_init_from_table(ventana_clk_init_table);
 	ventana_pinmux_init();
-
+	ventana_i2c_init();
 	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata;
@@ -542,7 +542,6 @@ static void __init tegra_ventana_init(void)
 	platform_add_devices(ventana_devices, ARRAY_SIZE(ventana_devices));
 
 	ventana_sdhci_init();
-	ventana_i2c_init();
 	ventana_charge_init();
 	ventana_regulator_init();
 
