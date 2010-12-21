@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.36
-# Mon Dec 20 16:39:50 2010
+# Thu Dec 23 14:51:41 2010
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -1125,6 +1125,7 @@ CONFIG_INPUT_GPIO=y
 # CONFIG_INPUT_PWM_BEEPER is not set
 # CONFIG_INPUT_GPIO_ROTARY_ENCODER is not set
 # CONFIG_INPUT_ADXL34X is not set
+CONFIG_INPUT_ALPS_GPIO_SCROLLWHEEL=y
 
 #
 # Hardware I/O ports
@@ -1860,6 +1861,7 @@ CONFIG_RTC_INTF_ALARM_DEV=y
 # CONFIG_RTC_DRV_ISL1208 is not set
 # CONFIG_RTC_DRV_ISL12022 is not set
 # CONFIG_RTC_DRV_X1205 is not set
+# CONFIG_RTC_DRV_TEGRA is not set
 # CONFIG_RTC_DRV_PCF8563 is not set
 # CONFIG_RTC_DRV_PCF8583 is not set
 # CONFIG_RTC_DRV_M41T80 is not set
