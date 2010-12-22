@@ -383,12 +383,12 @@ static int __init ventana_touch_init_panjit(void)
  * Reads the CHANGELINE state; interrupt is valid if the changeline
  * is low.
  */
-static u8 read_chg()
+static u8 read_chg(void)
 {
 	return gpio_get_value(TEGRA_GPIO_PV6);
 }
 
-static u8 valid_interrupt()
+static u8 valid_interrupt(void)
 {
 	return !read_chg();
 }
@@ -447,13 +447,13 @@ static struct tegra_ehci_platform_data tegra_ehci_pdata[] = {
 	},
 };
 
-static void ventana_usb_init()
+static void ventana_usb_init(void)
 {
 	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
 }
 
-struct platform_device *tegra_usb_otg_host_register()
+struct platform_device *tegra_usb_otg_host_register(void)
 {
 	struct platform_device *pdev;
 	void *platform_data;
@@ -529,6 +529,10 @@ static void __init ventana_power_off_init(void)
 static void __init tegra_ventana_init(void)
 {
 	char serial[20];
+#if defined(CONFIG_TOUCHSCREEN_PANJIT_I2C) && \
+	defined(CONFIG_TOUCHSCREEN_ATMEL_MT_T9)
+	struct board_info BoardInfo;
+#endif
 
 	tegra_common_init();
 	tegra_clk_init_from_table(ventana_clk_init_table);
@@ -545,11 +549,30 @@ static void __init tegra_ventana_init(void)
 	ventana_charge_init();
 	ventana_regulator_init();
 
-#ifdef	CONFIG_TOUCHSCREEN_PANJIT_I2C
-	ventana_touch_init_panjit();
-#endif
-#ifdef  CONFIG_TOUCHSCREEN_ATMEL_MT_T9
+#if defined(CONFIG_TOUCHSCREEN_PANJIT_I2C) && \
+	defined(CONFIG_TOUCHSCREEN_ATMEL_MT_T9)
+
+#define NVODM_ATMEL_TOUCHSCREEN 0x0A00
+#define NVODM_PANJIT_TOUCHSCREEN 0x0000
+
+	tegra_get_board_info(&BoardInfo);
+
+	switch (BoardInfo.sku & 0xFF00) {
+	case NVODM_ATMEL_TOUCHSCREEN:
+		pr_info("Initializing Atmel touch driver\n");
+		ventana_touch_init_atmel();
+		break;
+	default:
+		pr_info("Initializing Panjit touch driver\n");
+		ventana_touch_init_panjit();
+		break;
+	}
+#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MT_T9)
+	pr_info("Initializing Atmel touch driver\n");
 	ventana_touch_init_atmel();
+#elif defined(CONFIG_TOUCHSCREEN_PANJIT_I2C)
+	pr_info("Initializing Panjit touch driver\n");
+	ventana_touch_init_panjit();
 #endif
 
 #ifdef CONFIG_KEYBOARD_GPIO
