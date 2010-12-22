@@ -328,7 +328,6 @@ static int __init tegra_rtc_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret;
 
-	/* get resources from arch/arm/mach-tegra/board-nvodm.c */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		dev_err(
@@ -441,7 +440,6 @@ static void tegra_rtc_shutdown(struct platform_device *pdev)
 	tegra_rtc_alarm_irq_enable(&pdev->dev, 0);
 }
 
-MODULE_ALIAS("platform:tegra_rtc");
 static struct platform_driver tegra_rtc_driver = {
 	.remove		= __devexit_p(tegra_rtc_remove),
 	.shutdown	= tegra_rtc_shutdown,
@@ -467,6 +465,7 @@ static void __exit tegra_rtc_exit(void)
 }
 module_exit(tegra_rtc_exit);
 
+MODULE_ALIAS("platform:tegra_rtc");
 MODULE_AUTHOR("NVIDIA Corporation");
 MODULE_DESCRIPTION("driver for Tegra internal RTC");
 MODULE_LICENSE("GPL");
