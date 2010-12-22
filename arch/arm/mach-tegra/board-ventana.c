@@ -51,6 +51,7 @@
 #include <mach/iomap.h>
 #include <mach/io.h>
 #include <mach/i2s.h>
+#include <mach/spdif.h>
 #include <mach/audio.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -83,6 +84,13 @@ static struct platform_device debug_uart = {
 	.dev = {
 		.platform_data = debug_uart_platform_data,
 	},
+};
+
+static struct tegra_audio_platform_data tegra_spdif_pdata = {
+	.dma_on = true,  /* use dma by default */
+	.i2s_clk_rate = 5644800,
+	.mode = SPDIF_BIT_MODE_MODE16BIT,
+	.fifo_fmt = 0,
 };
 
 static struct tegra_utmip_config utmi_phy_config[] = {
@@ -162,6 +170,7 @@ static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	{ "i2s2",	"pll_a_out0",	11289600,	true},
 	{ "audio",	"pll_a_out0",	11289600,	true},
 	{ "audio_2x",	"audio",	22579200,	true},
+	{ "spdif_out",	"pll_a_out0",	5644800,	false},
 	{ "kbc",	"clk_32k",	32768,		true},
 	{ NULL,		NULL,		0,		0},
 };
@@ -347,6 +356,7 @@ static struct platform_device *ventana_devices[] __initdata = {
 #endif
 	&tegra_wdt_device,
 	&tegra_i2s_device1,
+	&tegra_spdif_device,
 	&tegra_avp_device,
 	&tegra_camera,
 };
@@ -541,6 +551,7 @@ static void __init tegra_ventana_init(void)
 	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata;
+	tegra_spdif_device.dev.platform_data = &tegra_spdif_pdata;
 	tegra_ehci2_device.dev.platform_data
 		= &ventana_ehci2_ulpi_platform_data;
 	platform_add_devices(ventana_devices, ARRAY_SIZE(ventana_devices));
