@@ -251,7 +251,7 @@ struct sdhci_host {
 /* Controller write protect bit is broken. Assume no write protection */
 #define SDHCI_QUIRK_BROKEN_WRITE_PROTECT		(1<<30)
 /* Controller needs INTERRUPT_AT_BLOCK_GAP enabled to detect card interrupts */
-#define SDHCI_QUIRK_ENABLE_INTERRUPT_AT_BLOCK_GAP	(1<<31)
+#define SDHCI_QUIRK_ENABLE_INTERRUPT_AT_BLOCK_GAP	(1LL<<31)
 /* Controller should not program HIGH_SPEED_EN after switching to high speed */
 #define SDHCI_QUIRK_BROKEN_CTRL_HISPD			(1LL<<32)
 /* Controller supports 8-bit data width */
