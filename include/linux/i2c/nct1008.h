@@ -25,8 +25,8 @@
 
 /* config params */
 #define NCT1008_CONFIG_ALERT_DISABLE	0x80
-#define NCT1008_CONFIG_RUN_STANDBY		0x40
-#define NCT1008_CONFIG_ALERT_THERM2		0x20
+#define NCT1008_CONFIG_RUN_STANDBY	0x40
+#define NCT1008_CONFIG_ALERT_THERM2	0x20
 #define NCT1008_CONFIG_ENABLE_EXTENDED	0x04
 
 struct nct1008_platform_data {
@@ -38,6 +38,9 @@ struct nct1008_platform_data {
 
 	/* cpu shut down threshold */
 	int thermal_threshold;
+
+	/* temperature offset */
+	int offset;
 };
 
 #endif /* _LINUX_NCT1008_H */
