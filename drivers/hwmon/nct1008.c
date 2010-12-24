@@ -36,12 +36,8 @@
 #define NCT1008_MFR_ID_RD			0xFE
 
 #define NCT1008_CONFIG_WR			0x09
- #define NCT1008_CONFIG_ALERT_DISABLE		0x80
- #define NCT1008_CONFIG_RUN_STANDBY		0x40
- #define NCT1008_CONFIG_ALERT_THERM2		0x20
- #define NCT1008_CONFIG_ENABLE_EXTENDED		0x04
-
 #define NCT1008_CONV_RATE_WR			0x0A
+#define NCT1008_OFFSET_WR			0x11
 #define NCT1008_LOCAL_THERM_LIMIT_WR		0x20
 
 #define DRIVER_NAME "nct1008"
@@ -70,7 +66,7 @@ static ssize_t nct1008_show_temp(struct device *dev,
 	}
 
 	temp_value = (signed int)data;
-	return sprintf(buf, "%d", temp_value);
+	return sprintf(buf, "%d\n", temp_value);
 }
 
 static DEVICE_ATTR(temperature, S_IRUGO, nct1008_show_temp, NULL);
@@ -127,18 +123,20 @@ static int __devinit nct1008_probe(struct i2c_client *client,
 		goto fail_alloc;
 	}
 
-	data = i2c_smbus_read_byte_data(client, NCT1008_CONFIG_RD);
-	if (data < 0) {
-		dev_err(&client->dev, "%s: failed to read config\n", __func__);
-		err = data;
-		goto fail_alloc;
-	}
-
 	/* set config params */
-	data |= pdata->plat_data.config;
+	data = pdata->plat_data.config;
 	err = i2c_smbus_write_byte_data(client, NCT1008_CONFIG_WR, data);
 	if (err < 0) {
 		dev_err(&client->dev, "%s: failed to set config\n", __func__);
+		goto fail_alloc;
+	}
+
+	/* set offset value */
+	data = pdata->plat_data.offset;
+	err = i2c_smbus_write_byte_data(client, NCT1008_OFFSET_WR, data);
+	if (err < 0) {
+		dev_err(&client->dev,
+				"%s: failed to set offset\n", __func__);
 		goto fail_alloc;
 	}
 
