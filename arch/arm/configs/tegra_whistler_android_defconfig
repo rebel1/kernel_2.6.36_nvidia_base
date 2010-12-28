@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.36.2
-# Wed Dec 29 13:01:39 2010
+# Wed Dec 29 15:43:21 2010
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -738,7 +738,31 @@ CONFIG_NET_SCH_FIFO=y
 # CONFIG_HAMRADIO is not set
 # CONFIG_CAN is not set
 # CONFIG_IRDA is not set
-# CONFIG_BT is not set
+CONFIG_BT=y
+CONFIG_BT_L2CAP=y
+CONFIG_BT_SCO=y
+CONFIG_BT_RFCOMM=y
+CONFIG_BT_RFCOMM_TTY=y
+CONFIG_BT_BNEP=y
+# CONFIG_BT_BNEP_MC_FILTER is not set
+# CONFIG_BT_BNEP_PROTO_FILTER is not set
+CONFIG_BT_HIDP=y
+
+#
+# Bluetooth device drivers
+#
+# CONFIG_BT_HCIBTUSB is not set
+# CONFIG_BT_HCIBTSDIO is not set
+CONFIG_BT_HCIUART=y
+CONFIG_BT_HCIUART_H4=y
+# CONFIG_BT_HCIUART_BCSP is not set
+# CONFIG_BT_HCIUART_ATH3K is not set
+CONFIG_BT_HCIUART_LL=y
+# CONFIG_BT_HCIBCM203X is not set
+# CONFIG_BT_HCIBPA10X is not set
+# CONFIG_BT_HCIBFUSB is not set
+# CONFIG_BT_HCIVHCI is not set
+# CONFIG_BT_MRVL is not set
 # CONFIG_AF_RXRPC is not set
 CONFIG_FIB_RULES=y
 CONFIG_WIRELESS=y
@@ -753,7 +777,9 @@ CONFIG_WIRELESS=y
 # Some wireless drivers require a rate control algorithm
 #
 # CONFIG_WIMAX is not set
-# CONFIG_RFKILL is not set
+CONFIG_RFKILL=y
+CONFIG_RFKILL_PM=y
+# CONFIG_RFKILL_INPUT is not set
 # CONFIG_NET_9P is not set
 # CONFIG_CAIF is not set
 
@@ -895,8 +921,9 @@ CONFIG_KERNEL_DEBUGGER_CORE=y
 # CONFIG_TI_DAC7512 is not set
 # CONFIG_UID_STAT is not set
 # CONFIG_BMP085 is not set
+# CONFIG_WL127X_RFKILL is not set
 # CONFIG_APANIC is not set
-# CONFIG_BCM4329_RFKILL is not set
+CONFIG_BCM4329_RFKILL=y
 # CONFIG_C2PORT is not set
 
 #
@@ -1019,6 +1046,7 @@ CONFIG_WLAN=y
 # CONFIG_USB_PEGASUS is not set
 # CONFIG_USB_RTL8150 is not set
 # CONFIG_USB_USBNET is not set
+# CONFIG_USB_HSO is not set
 # CONFIG_USB_IPHETH is not set
 # CONFIG_WAN is not set
 
@@ -1587,12 +1615,14 @@ CONFIG_USB_HID=y
 # CONFIG_HID_CYPRESS is not set
 # CONFIG_HID_DRAGONRISE is not set
 # CONFIG_HID_EGALAX is not set
+# CONFIG_HID_ELECOM is not set
 # CONFIG_HID_EZKEY is not set
 # CONFIG_HID_KYE is not set
 # CONFIG_HID_GYRATION is not set
 # CONFIG_HID_TWINHAN is not set
 # CONFIG_HID_KENSINGTON is not set
 # CONFIG_HID_LOGITECH is not set
+# CONFIG_HID_MAGICMOUSE is not set
 # CONFIG_HID_MICROSOFT is not set
 # CONFIG_HID_MOSART is not set
 # CONFIG_HID_MONTEREY is not set
@@ -1612,6 +1642,7 @@ CONFIG_USB_HID=y
 # CONFIG_HID_SMARTJOYPLUS is not set
 # CONFIG_HID_TOPSEED is not set
 # CONFIG_HID_THRUSTMASTER is not set
+# CONFIG_HID_WACOM is not set
 # CONFIG_HID_ZEROPLUS is not set
 # CONFIG_HID_ZYDACRON is not set
 CONFIG_USB_SUPPORT=y
@@ -1991,6 +2022,8 @@ CONFIG_IIO=y
 #
 # Texas Instruments shared transport line discipline
 #
+# CONFIG_TI_ST is not set
+# CONFIG_ST_BT is not set
 # CONFIG_ADIS16255 is not set
 # CONFIG_LIRC_STAGING is not set
 # CONFIG_EASYCAP is not set
