@@ -92,6 +92,7 @@ struct tegra_runtime_data {
 	volatile int state;
 	int period_index;
 	int i2s_shutdown;
+	int dma_state;
 	struct tegra_dma_channel *dma_chan;
 	struct clk *i2s_clk;
 	struct clk *dap_mclk;
