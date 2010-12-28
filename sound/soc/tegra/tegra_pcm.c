@@ -215,6 +215,11 @@ static int tegra_pcm_hw_free(struct snd_pcm_substream *substream)
 
 static int tegra_pcm_prepare(struct snd_pcm_substream *substream)
 {
+	struct tegra_runtime_data *prtd = substream->runtime->private_data;
+
+	prtd->dma_pos = 0;
+	prtd->period_index = 0;
+
 	return 0;
 }
 
@@ -246,7 +251,8 @@ static int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		prtd->state = STATE_ABORT;
-		prtd->dma_state = prtd->dma_state = STATE_ABORT;
+		prtd->dma_state = STATE_ABORT;
+		tegra_dma_cancel(prtd->dma_chan);
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			if (prtd->dma_chan) {
 				stop_i2s_playback();
@@ -283,6 +289,9 @@ static snd_pcm_uframes_t tegra_pcm_pointer(struct snd_pcm_substream *substream)
 
 static int tegra_pcm_open(struct snd_pcm_substream *substream)
 {
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai_link *machine = rtd->dai;
+	struct snd_soc_dai *cpu_dai = machine->cpu_dai;
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct tegra_runtime_data *prtd;
 	int ret=0;
@@ -363,10 +372,12 @@ fail:
 		tegra_dma_flush(prtd->dma_chan);
 		tegra_dma_free_channel(prtd->dma_chan);
 	}
-	/* Tristate the DAP pinmux */
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP1,TEGRA_TRI_TRISTATE);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV1,TEGRA_TRI_TRISTATE);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV2,TEGRA_TRI_TRISTATE);
+
+	if (cpu_dai->active == 0) {
+		tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP1,TEGRA_TRI_TRISTATE);
+		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV1,TEGRA_TRI_TRISTATE);
+		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV2,TEGRA_TRI_TRISTATE);
+	}
 
 	kfree(prtd);
 
@@ -376,6 +387,9 @@ end:
 
 static int tegra_pcm_close(struct snd_pcm_substream *substream)
 {
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai_link *machine = rtd->dai;
+	struct snd_soc_dai *cpu_dai = machine->cpu_dai;
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct tegra_runtime_data *prtd = runtime->private_data;
 
@@ -390,16 +404,22 @@ static int tegra_pcm_close(struct snd_pcm_substream *substream)
 		prtd->dma_state = STATE_EXIT;
 		tegra_dma_dequeue_req(prtd->dma_chan, &prtd->dma_req1);
 		tegra_dma_dequeue_req(prtd->dma_chan, &prtd->dma_req2);
-		stop_i2s_playback();
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			stop_i2s_playback();
+		else
+			stop_i2s_capture();
 		tegra_dma_flush(prtd->dma_chan);
 		tegra_dma_free_channel(prtd->dma_chan);
 		prtd->dma_chan = NULL;
 	}
 
 	kfree(prtd);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP1,TEGRA_TRI_TRISTATE);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV1,TEGRA_TRI_TRISTATE);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV2,TEGRA_TRI_TRISTATE);
+
+	if (cpu_dai->active == 0) {
+		tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP1,TEGRA_TRI_TRISTATE);
+		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV1,TEGRA_TRI_TRISTATE);
+		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV2,TEGRA_TRI_TRISTATE);
+	}
 
 	return 0;
 }
