@@ -20,6 +20,7 @@
 #include "tegra_soc.h"
 
 static void *das_base = IO_ADDRESS(TEGRA_APB_MISC_BASE);
+struct snd_soc_dai tegra_i2s_dai;
 
 static inline unsigned long das_readl(unsigned long offset)
 {
@@ -72,7 +73,7 @@ static int tegra_i2s_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	i2s_set_channel_bit_count(I2S_IFC, val, clk_get_rate(prtd->i2s_clk));
-
+	tegra_i2s_dai.private_data = (void *)prtd;
 	return 0;
 
 err:
@@ -199,6 +200,26 @@ static int tegra_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 	return ret;
 }
 
+#ifdef CONFIG_PM
+int tegra_i2s_suspend(struct snd_soc_dai *i2s_dai)
+{
+	struct tegra_runtime_data *prtd = (struct snd_pcm_runtime *)(tegra_i2s_dai.private_data);
+	i2s_get_all_regs(I2S_IFC, &prtd->i2s_regs);
+	return 0;
+}
+
+int tegra_i2s_resume(struct snd_soc_dai *i2s_dai)
+{
+	struct tegra_runtime_data *prtd = (struct snd_pcm_runtime *)(tegra_i2s_dai.private_data);
+	i2s_set_all_regs(I2S_IFC, &prtd->i2s_regs);
+	return 0;
+}
+
+#else
+#define tegra_i2s_suspend	NULL
+#define tegra_i2s_resume	NULL
+#endif
+
 static int tegra_i2s_startup(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
@@ -227,35 +248,6 @@ static int tegra_i2s_probe(struct platform_device *pdev,
 	return 0;
 }
 
-static struct snd_soc_dai_ops tegra_i2s_dai_ops = {
-	.startup	= tegra_i2s_startup,
-	.shutdown	= tegra_i2s_shutdown,
-	.trigger	= tegra_i2s_trigger,
-	.hw_params  = tegra_i2s_hw_params,
-	.set_fmt	= tegra_i2s_set_dai_fmt,
-	.set_sysclk	= tegra_i2s_set_dai_sysclk,
-};
-
-struct snd_soc_dai tegra_i2s_dai = {
-	.name = "tegra-i2s",
-	.id = 0,
-	.probe = tegra_i2s_probe,
-	.playback = {
-		.channels_min = 2,
-		.channels_max = 2,
-		.rates = TEGRA_SAMPLE_RATES,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-	},
-	.capture = {
-		.channels_min = 2,
-		.channels_max = 2,
-		.rates = TEGRA_SAMPLE_RATES,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-	},
-	.ops = &tegra_i2s_dai_ops,
-};
-EXPORT_SYMBOL_GPL(tegra_i2s_dai);
-
 static int tegra_i2s_driver_probe(struct platform_device *dev)
 {
 	int ret;
@@ -272,6 +264,37 @@ static int __devexit tegra_i2s_driver_remove(struct platform_device *dev)
 	snd_soc_unregister_dai(&tegra_i2s_dai);
 	return 0;
 }
+
+static struct snd_soc_dai_ops tegra_i2s_dai_ops = {
+	.startup	= tegra_i2s_startup,
+	.shutdown	= tegra_i2s_shutdown,
+	.trigger	= tegra_i2s_trigger,
+	.hw_params  = tegra_i2s_hw_params,
+	.set_fmt	= tegra_i2s_set_dai_fmt,
+	.set_sysclk	= tegra_i2s_set_dai_sysclk,
+};
+
+struct snd_soc_dai tegra_i2s_dai = {
+	.name = "tegra-i2s",
+	.id = 0,
+	.probe = tegra_i2s_probe,
+	.suspend = tegra_i2s_suspend,
+	.resume = tegra_i2s_resume,
+	.playback = {
+		.channels_min = 2,
+		.channels_max = 2,
+		.rates = TEGRA_SAMPLE_RATES,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+	},
+	.capture = {
+		.channels_min = 2,
+		.channels_max = 2,
+		.rates = TEGRA_SAMPLE_RATES,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+	},
+	.ops = &tegra_i2s_dai_ops,
+};
+EXPORT_SYMBOL_GPL(tegra_i2s_dai);
 
 static struct platform_driver tegra_i2s_driver = {
 	.probe = tegra_i2s_driver_probe,

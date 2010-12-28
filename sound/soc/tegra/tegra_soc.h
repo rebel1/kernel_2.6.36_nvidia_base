@@ -91,10 +91,12 @@ struct tegra_runtime_data {
 	struct tegra_dma_req dma_req1, dma_req2;
 	volatile int state;
 	int period_index;
+	int i2s_shutdown;
 	struct tegra_dma_channel *dma_chan;
 	struct clk *i2s_clk;
 	struct clk *dap_mclk;
 	struct clk *audio_sync_clk;
+	struct i2s_runtime_data i2s_regs;
 };
 
 #endif

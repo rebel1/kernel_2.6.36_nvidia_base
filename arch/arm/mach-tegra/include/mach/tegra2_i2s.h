@@ -157,11 +157,22 @@
 #define I2S_I2S_FIFO_SCR_FIFO1_ATN_LVL_EIGHT_SLOTS	(I2S_FIFO_ATN_LVL_EIGHT_SLOTS  << I2S_FIFO1_ATN_LVL_SHIFT)
 #define I2S_I2S_FIFO_SCR_FIFO1_ATN_LVL_TWELVE_SLOTS	(I2S_FIFO_ATN_LVL_TWELVE_SLOTS << I2S_FIFO1_ATN_LVL_SHIFT)
 
+struct i2s_runtime_data {
+	int i2s_ctrl_0;
+	int i2s_status_0;
+	int i2s_timing_0;
+	int i2s__fifo_scr_0;
+	int i2s_fifo1_0;
+	int i2s_fifo2_0;
+};
+
 /*
  * API
  */
 
 void i2s_dump_registers(int ifc);
+void i2s_get_all_regs(int ifc, struct i2s_runtime_data* ird);
+void i2s_set_all_regs(int ifc, struct i2s_runtime_data* ird);
 int i2s_set_channel_bit_count(int ifc, int sampling, int bitclk);
 void i2s_set_fifo_mode(int ifc, int fifo, int tx);
 void i2s_set_loopback(int ifc, int on);

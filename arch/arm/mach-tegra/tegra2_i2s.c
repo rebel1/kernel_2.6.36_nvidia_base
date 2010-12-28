@@ -71,6 +71,28 @@ void i2s_dump_registers(int ifc)
 			i2s_readl(ifc, I2S_I2S_FIFO1_0));
 }
 
+void i2s_get_all_regs(int ifc, struct i2s_runtime_data* ird)
+{
+	check_ifc(ifc);
+	ird->i2s_ctrl_0 = i2s_readl(ifc, I2S_I2S_CTRL_0);
+	ird->i2s_status_0 = i2s_readl(ifc, I2S_I2S_STATUS_0);
+	ird->i2s_timing_0 = i2s_readl(ifc, I2S_I2S_TIMING_0);
+	ird->i2s__fifo_scr_0 = i2s_readl(ifc, I2S_I2S_FIFO_SCR_0);
+	ird->i2s_fifo1_0 = i2s_readl(ifc, I2S_I2S_FIFO1_0);
+	ird->i2s_fifo2_0 = i2s_readl(ifc, I2S_I2S_FIFO2_0);
+}
+
+void i2s_set_all_regs(int ifc, struct i2s_runtime_data* ird)
+{
+	check_ifc(ifc);
+	i2s_writel(ifc, ird->i2s_ctrl_0, I2S_I2S_CTRL_0);
+	i2s_writel(ifc, ird->i2s_status_0, I2S_I2S_STATUS_0);
+	i2s_writel(ifc, ird->i2s_timing_0, I2S_I2S_TIMING_0);
+	i2s_writel(ifc, ird->i2s__fifo_scr_0, I2S_I2S_FIFO_SCR_0);
+	i2s_writel(ifc, ird->i2s_fifo1_0, I2S_I2S_FIFO1_0);
+	i2s_writel(ifc, ird->i2s_fifo2_0, I2S_I2S_FIFO2_0);
+}
+
 int i2s_set_channel_bit_count(int ifc, int sampling, int bitclk)
 {
 	u32 val;
