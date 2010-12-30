@@ -387,50 +387,53 @@ int tegra_controls_init(struct snd_soc_codec *codec)
 {
 	int err;
 
-	audio_data = kzalloc(sizeof(*audio_data), GFP_KERNEL);
 	if (!audio_data) {
-		pr_err("failed to allocate tegra_audio_data \n");
-		return -ENOMEM;
-	}
+		audio_data = kzalloc(sizeof(*audio_data), GFP_KERNEL);
+		if (!audio_data) {
+			pr_err("failed to allocate tegra_audio_data \n");
+			return -ENOMEM;
+		}
 
-	/* Add tegra specific controls */
-	err = snd_soc_add_controls(codec, tegra_controls,
-					ARRAY_SIZE(tegra_controls));
-	if (err < 0)
-		goto fail;
+		/* Add tegra specific controls */
+		err = snd_soc_add_controls(codec, tegra_controls,
+						ARRAY_SIZE(tegra_controls));
+		if (err < 0)
+			goto fail;
 
-	/* Add tegra specific widgets */
-	snd_soc_dapm_new_controls(codec, tegra_dapm_widgets,
-					ARRAY_SIZE(tegra_dapm_widgets));
+		/* Add tegra specific widgets */
+		snd_soc_dapm_new_controls(codec, tegra_dapm_widgets,
+						ARRAY_SIZE(tegra_dapm_widgets));
 
-	/* Set up tegra specific audio path audio_map */
-	snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
+		/* Set up tegra specific audio path audio_map */
+		snd_soc_dapm_add_routes(codec, audio_map,
+				ARRAY_SIZE(audio_map));
 
-	audio_data->codec = codec;
-	/* Add play route control */
-	err = snd_ctl_add(codec->card,
+		audio_data->codec = codec;
+		/* Add play route control */
+		err = snd_ctl_add(codec->card,
 			snd_ctl_new1(&tegra_play_route_control, NULL));
-	if (err < 0)
-		goto fail;
+		if (err < 0)
+			goto fail;
 
-	/* Add capture route control */
-	err = snd_ctl_add(codec->card,
+		/* Add capture route control */
+		err = snd_ctl_add(codec->card,
 			snd_ctl_new1(&tegra_capture_route_control, NULL));
-	if (err < 0)
-		goto fail;
+		if (err < 0)
+			goto fail;
 
-	/* Add call mode switch control */
-	err = snd_ctl_add(codec->card,
+		/* Add call mode switch control */
+		err = snd_ctl_add(codec->card,
 			snd_ctl_new1(&tegra_call_mode_control, NULL));
-	if (err < 0)
-		goto fail;
+		if (err < 0)
+			goto fail;
 
-	/* Default to HP output */
-	tegra_jack_func = TEGRA_HP;
-	tegra_spk_func = TEGRA_SPK_ON;
-	tegra_ext_control(codec);
+		/* Default to HP output */
+		tegra_jack_func = TEGRA_HP;
+		tegra_spk_func = TEGRA_SPK_ON;
+		tegra_ext_control(codec);
 
-	snd_soc_dapm_sync(codec);
+		snd_soc_dapm_sync(codec);
+	}
 
 	return 0;
 fail:

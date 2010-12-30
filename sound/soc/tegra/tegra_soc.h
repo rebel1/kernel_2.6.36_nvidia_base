@@ -96,7 +96,6 @@ struct tegra_runtime_data {
 	struct clk *i2s_clk;
 	struct clk *dap_mclk;
 	struct clk *audio_sync_clk;
-	struct i2s_runtime_data i2s_regs;
 };
 
 struct tegra_audio_data {
@@ -108,5 +107,10 @@ struct tegra_audio_data {
 
 int tegra_controls_init(struct snd_soc_codec *codec);
 void tegra_controls_exit(void);
+
+int setup_dma_request(struct snd_pcm_substream *substream,
+			struct tegra_dma_req *req,
+			void (*dma_callback)(struct tegra_dma_req *req),
+			void *dma_data);
 
 #endif

@@ -20,7 +20,7 @@
 
 static struct platform_device *tegra_snd_device;
 
-extern struct snd_soc_dai tegra_i2s_dai;
+extern struct snd_soc_dai tegra_i2s_dai[];
 extern struct snd_soc_platform tegra_soc_platform;
 
 /* codec register values */
@@ -162,22 +162,33 @@ static int tegra_codec_init(struct snd_soc_codec *codec)
 	return tegra_controls_init(codec);
 }
 
+static struct snd_soc_dai_link tegra_soc_dai[] = {
+	{
+		.name = "WM8903",
+		.stream_name = "WM8903 HiFi",
+		.cpu_dai = &tegra_i2s_dai[0],
+		.codec_dai = &wm8903_dai,
+		.init = tegra_codec_init,
+		.ops = &tegra_hifi_ops,
+	},
+	{
+		.name = "WM8903",
+		.stream_name = "WM8903 Voice",
+		.cpu_dai = &tegra_i2s_dai[1],
+		.codec_dai = &wm8903_dai,
+		.init = tegra_codec_init,
+		.ops = &tegra_hifi_ops,
+	},
 
-static struct snd_soc_dai_link tegra_soc_dai = {
-	.name = "WM8903",
-	.stream_name = "WM8903 HiFi",
-	.cpu_dai = &tegra_i2s_dai,
-	.codec_dai = &wm8903_dai,
-	.init = tegra_codec_init,
-	.ops = &tegra_hifi_ops,
 };
 
 static struct snd_soc_card tegra_snd_soc = {
 	.name = "tegra",
 	.platform = &tegra_soc_platform,
-	.dai_link = &tegra_soc_dai,
-	.num_links = 1,
+	.dai_link = tegra_soc_dai,
+	.num_links = ARRAY_SIZE(tegra_soc_dai),
 };
+
 
 static struct snd_soc_device tegra_snd_devdata = {
 	.card = &tegra_snd_soc,

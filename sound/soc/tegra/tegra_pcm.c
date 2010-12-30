@@ -23,21 +23,6 @@
 #define PLAYBACK_STARTED true
 #define PLAYBACK_STOPPED false
 
-static void start_i2s_playback(void)
-{
-	i2s_fifo_set_attention_level(I2S_IFC, I2S_FIFO_TX,
-					I2S_FIFO_ATN_LVL_FOUR_SLOTS);
-	i2s_fifo_enable(I2S_IFC, I2S_FIFO_TX, 1);
-}
-
-static void stop_i2s_playback(void)
-{
-	i2s_set_fifo_irq_on_err(I2S_IFC, I2S_FIFO_TX, 0);
-	i2s_set_fifo_irq_on_qe(I2S_IFC, I2S_FIFO_TX, 0);
-	i2s_fifo_enable(I2S_IFC, I2S_FIFO_TX, 0);
-	while (i2s_get_status(I2S_IFC) & I2S_I2S_FIFO_TX_BUSY);
-}
-
 static void tegra_pcm_play(struct tegra_runtime_data *prtd)
 {
 	static int reqid = 0;
@@ -73,51 +58,6 @@ static void tegra_pcm_play(struct tegra_runtime_data *prtd)
 		prtd->dma_pos = 0;
 	}
 
-}
-
-static void dma_tx_complete_callback (struct tegra_dma_req *req)
-{
-	struct tegra_runtime_data *prtd = (struct tegra_runtime_data *)req->dev;
-	struct snd_pcm_substream *substream = prtd->substream;
-	struct snd_pcm_runtime *runtime = substream->runtime;
-
-	if (++prtd->period_index >= runtime->periods) {
-		prtd->period_index = 0;
-	}
-
-	if (prtd->dma_state != STATE_ABORT) {
-		snd_pcm_period_elapsed(substream);
-		tegra_pcm_play(prtd);
-	}
-}
-
-static void setup_dma_tx_request(struct tegra_dma_req *req)
-{
-	memset(req, 0, sizeof(*req));
-	req->complete = dma_tx_complete_callback;
-	req->to_memory = false;
-	req->dest_addr = i2s_get_fifo_phy_base(I2S_IFC, I2S_FIFO_TX);
-	req->dest_wrap = 4;
-	req->source_bus_width = 32;
-	req->source_wrap = 0;
-	req->dest_bus_width = 32;
-	req->req_sel = I2S_IFC ? 1 : 2; /* 1 = I2S2, 2 = I2S1 */
-}
-
-/* recording */
-static void start_i2s_capture(void)
-{
-	i2s_fifo_set_attention_level(I2S_IFC, I2S_FIFO_RX,
-					I2S_FIFO_ATN_LVL_FOUR_SLOTS);
-	i2s_fifo_enable(I2S_IFC, I2S_FIFO_RX, 1);
-}
-
-static void stop_i2s_capture(void)
-{
-	i2s_set_fifo_irq_on_err(I2S_IFC, I2S_FIFO_RX, 0);
-	i2s_set_fifo_irq_on_qe(I2S_IFC, I2S_FIFO_RX, 0);
-	i2s_fifo_enable(I2S_IFC, I2S_FIFO_RX, 0);
-	while (i2s_get_status(I2S_IFC) & I2S_I2S_FIFO_RX_BUSY);
 }
 
 static void tegra_pcm_capture(struct tegra_runtime_data *prtd)
@@ -157,7 +97,7 @@ static void tegra_pcm_capture(struct tegra_runtime_data *prtd)
 
 }
 
-static void dma_rx_complete_callback(struct tegra_dma_req *req)
+static void dma_complete_callback (struct tegra_dma_req *req)
 {
 	struct tegra_runtime_data *prtd = (struct tegra_runtime_data *)req->dev;
 	struct snd_pcm_substream *substream = prtd->substream;
@@ -169,21 +109,12 @@ static void dma_rx_complete_callback(struct tegra_dma_req *req)
 
 	if (prtd->dma_state != STATE_ABORT) {
 		snd_pcm_period_elapsed(substream);
-		tegra_pcm_capture(prtd);
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			tegra_pcm_play(prtd);
+		} else {
+			tegra_pcm_capture(prtd);
+		}
 	}
-}
-
-static void setup_dma_rx_request(struct tegra_dma_req *req)
-{
-	memset(req, 0, sizeof(*req));
-	req->complete = dma_rx_complete_callback;
-	req->to_memory = true;
-	req->source_addr = i2s_get_fifo_phy_base(I2S_IFC, I2S_FIFO_RX);
-	req->dest_wrap = 0;
-	req->source_bus_width = 32;
-	req->source_wrap = 4;
-	req->dest_bus_width = 32;
-	req->req_sel = I2S_IFC ? 1 : 2; /* 1 = I2S2, 2 = I2S1 */
 }
 
 static const struct snd_pcm_hardware tegra_pcm_hardware = {
@@ -238,14 +169,12 @@ static int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 			prtd->dma_state = STATE_INIT;
 			tegra_pcm_play(prtd); /* dma enqueue req1 */
 			tegra_pcm_play(prtd); /* dma enqueue req2 */
-			start_i2s_playback();
 		} else if (prtd->state != STATE_INIT) {
 			/* start recording */
 			prtd->state = STATE_INIT;
 			prtd->dma_state = STATE_INIT;
 			tegra_pcm_capture(prtd); /* dma enqueue req1 */
 			tegra_pcm_capture(prtd); /* dma enqueue req2 */
-			start_i2s_capture();
 		}
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
@@ -256,7 +185,6 @@ static int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		tegra_dma_cancel(prtd->dma_chan);
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			if (prtd->dma_chan) {
-				stop_i2s_playback();
 				tegra_dma_dequeue_req(prtd->dma_chan,
 							&prtd->dma_req1);
 				tegra_dma_dequeue_req(prtd->dma_chan,
@@ -264,7 +192,6 @@ static int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 			}
 		} else {
 			if (prtd->dma_chan) {
-				stop_i2s_capture();
 				tegra_dma_dequeue_req(prtd->dma_chan,
 							&prtd->dma_req1);
 				tegra_dma_dequeue_req(prtd->dma_chan,
@@ -337,16 +264,15 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 
 	prtd->state = STATE_INVALID;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		setup_dma_tx_request(&prtd->dma_req1);
-		setup_dma_tx_request(&prtd->dma_req2);
-	} else {
-		setup_dma_rx_request(&prtd->dma_req1);
-		setup_dma_rx_request(&prtd->dma_req2);
-	}
+	setup_dma_request(substream,
+			&prtd->dma_req1,
+			dma_complete_callback,
+			prtd);
 
-	prtd->dma_req1.dev = prtd;
-	prtd->dma_req2.dev = prtd;
+	setup_dma_request(substream,
+			&prtd->dma_req2,
+			dma_complete_callback,
+			prtd);
 
 	prtd->dma_chan = tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINUOUS_DOUBLE);
 	if (IS_ERR(prtd->dma_chan)) {
@@ -394,10 +320,6 @@ static int tegra_pcm_close(struct snd_pcm_substream *substream)
 		prtd->dma_state = STATE_EXIT;
 		tegra_dma_dequeue_req(prtd->dma_chan, &prtd->dma_req1);
 		tegra_dma_dequeue_req(prtd->dma_chan, &prtd->dma_req2);
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			stop_i2s_playback();
-		else
-			stop_i2s_capture();
 		tegra_dma_flush(prtd->dma_chan);
 		tegra_dma_free_channel(prtd->dma_chan);
 		prtd->dma_chan = NULL;
