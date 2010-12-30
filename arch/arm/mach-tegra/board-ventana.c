@@ -281,14 +281,27 @@ static struct tegra_i2c_platform_data ventana_dvc_platform_data = {
 	.is_dvc		= true,
 };
 
-static struct tegra_audio_platform_data tegra_audio_pdata = {
-	.dma_on		= true,  /* use dma by default */
-	.i2s_clk_rate	= 240000000,
-	.dap_clk	= "clk_dev1",
-	.audio_sync_clk = "audio_2x",
-	.mode		= I2S_BIT_FORMAT_I2S,
-	.fifo_fmt	= I2S_FIFO_16_LSB,
-	.bit_size	= I2S_BIT_SIZE_16,
+static struct tegra_audio_platform_data tegra_audio_pdata[] = {
+	/* For I2S1 */
+	[0] = {
+		.dma_on		= true,  /* use dma by default */
+		.i2s_clk_rate	= 240000000,
+		.dap_clk	= "clk_dev1",
+		.audio_sync_clk = "audio_2x",
+		.mode		= I2S_BIT_FORMAT_I2S,
+		.fifo_fmt	= I2S_FIFO_16_LSB,
+		.bit_size	= I2S_BIT_SIZE_16,
+	},
+	/* For I2S2 */
+	[1] = {
+		.dma_on		= true,  /* use dma by default */
+		.i2s_clk_rate	= 240000000,
+		.dap_clk	= "clk_dev1",
+		.audio_sync_clk = "audio_2x",
+		.mode		= I2S_BIT_FORMAT_I2S,
+		.fifo_fmt	= I2S_FIFO_16_LSB,
+		.bit_size	= I2S_BIT_SIZE_16,
+	}
 };
 
 static void ventana_i2c_init(void)
@@ -372,6 +385,7 @@ static struct platform_device *ventana_devices[] __initdata = {
 #endif
 	&tegra_wdt_device,
 	&tegra_i2s_device1,
+	&tegra_i2s_device2,
 	&tegra_spdif_device,
 	&tegra_avp_device,
 	&tegra_camera,
@@ -566,7 +580,8 @@ static void __init tegra_ventana_init(void)
 	ventana_i2c_init();
 	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
-	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata;
+	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata[0];
+	tegra_i2s_device2.dev.platform_data = &tegra_audio_pdata[1];
 	tegra_spdif_device.dev.platform_data = &tegra_spdif_pdata;
 	tegra_ehci2_device.dev.platform_data
 		= &ventana_ehci2_ulpi_platform_data;
