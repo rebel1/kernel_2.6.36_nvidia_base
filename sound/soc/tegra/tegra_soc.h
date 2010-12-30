@@ -33,11 +33,13 @@
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
+#include <linux/tegra_audio.h>
 #include <mach/iomap.h>
 #include <mach/tegra2_i2s.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
 #include <mach/audio.h>
+#include <mach/tegra_das.h>
 #include <mach/dma.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -95,6 +97,13 @@ struct tegra_runtime_data {
 	struct clk *dap_mclk;
 	struct clk *audio_sync_clk;
 	struct i2s_runtime_data i2s_regs;
+};
+
+struct tegra_audio_data {
+	struct snd_soc_codec *codec;
+	int play_device;
+	int capture_device;
+	bool is_call_mode;
 };
 
 #endif
