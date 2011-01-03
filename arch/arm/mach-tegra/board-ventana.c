@@ -64,6 +64,21 @@
 #include "gpio-names.h"
 #include "fuse.h"
 
+static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
+	.vendor = "NVIDIA",
+	.product = "Tegra 2",
+	.nluns = 1,
+	.bulk_size = 16384,
+};
+
+static struct platform_device tegra_usb_fsg_device = {
+	.name = "usb_mass_storage",
+	.id = -1,
+	.dev = {
+		.platform_data = &tegra_usb_fsg_platform,
+	},
+};
+
 static struct plat_serial8250_port debug_uart_platform_data[] = {
 	{
 		.membase	= IO_ADDRESS(TEGRA_UARTD_BASE),
@@ -175,8 +190,9 @@ static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	{ NULL,		NULL,		0,		0},
 };
 
-static char *usb_functions[] = { "mtp" };
-static char *usb_functions_adb[] = { "mtp", "adb" };
+static char *usb_functions[] = { "mtp", "usb_mass_storage" };
+static char *usb_functions_adb[] = { "mtp", "adb", "usb_mass_storage" };
+
 
 static struct android_usb_product usb_products[] = {
 	{
@@ -342,6 +358,7 @@ static struct platform_device tegra_camera = {
 
 static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_otg_device,
+	&tegra_usb_fsg_device,
 	&androidusb_device,
 	&debug_uart,
 	&tegra_uartb_device,
