@@ -215,6 +215,11 @@ static struct platform_device whistler_scroll_device = {
 	},
 };
 
+static struct platform_device tegra_camera = {
+	.name = "tegra_camera",
+	.id = -1,
+};
+
 static struct platform_device *whistler_devices[] __initdata = {
 	&androidusb_device,
 	&debug_uart,
@@ -225,6 +230,7 @@ static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_wdt_device,
 	&tegra_avp_device,
 	&whistler_scroll_device,
+	&tegra_camera,
 };
 
 static struct synaptics_i2c_rmi_platform_data synaptics_pdata= {
@@ -273,6 +279,7 @@ static void __init tegra_whistler_init(void)
 	whistler_i2c_init();
 	whistler_regulator_init();
 	whistler_panel_init();
+	whistler_sensors_init();
 	whistler_touch_init();
 	whistler_kbc_init();
 	whistler_bt_rfkill();
