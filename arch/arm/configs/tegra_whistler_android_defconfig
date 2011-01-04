@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.36.2
-# Wed Dec 29 15:43:21 2010
+# Tue Jan  4 15:24:29 2011
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -262,8 +262,8 @@ CONFIG_ARCH_TEGRA_2x_SOC=y
 #
 # Tegra board type
 #
-CONFIG_MACH_HARMONY=y
-CONFIG_MACH_VENTANA=y
+# CONFIG_MACH_HARMONY is not set
+# CONFIG_MACH_VENTANA is not set
 CONFIG_MACH_WHISTLER=y
 # CONFIG_TEGRA_DEBUG_UART_NONE is not set
 CONFIG_TEGRA_DEBUG_UARTA=y
