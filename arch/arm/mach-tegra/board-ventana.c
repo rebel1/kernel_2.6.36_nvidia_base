@@ -385,7 +385,7 @@ static struct platform_device *ventana_devices[] __initdata = {
 #endif
 	&tegra_wdt_device,
 	&tegra_i2s_device1,
-	&tegra_i2s_device2,
+	/* &tegra_i2s_device2, */
 	&tegra_spdif_device,
 	&tegra_avp_device,
 	&tegra_camera,
