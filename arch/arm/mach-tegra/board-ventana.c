@@ -56,6 +56,7 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <mach/usb_phy.h>
+#include <mach/tegra_das.h>
 
 #include "board.h"
 #include "clock.h"
@@ -304,6 +305,73 @@ static struct tegra_audio_platform_data tegra_audio_pdata[] = {
 	}
 };
 
+static struct tegra_das_platform_data tegra_das_pdata = {
+	.tegra_dap_port_info_table = {
+		[0] = {
+			.dac_port = tegra_das_port_none,
+			.codec_type = tegra_audio_codec_type_none,
+			.device_property = {
+				.num_channels = 0,
+				.bits_per_sample = 0,
+				.rate = 0,
+				.dac_dap_data_comm_format = 0,
+			},
+		},
+		/* I2S1 <--> DAC1 <--> DAP1 <--> Hifi Codec */
+		[1] = {
+			.dac_port = tegra_das_port_i2s1,
+			.codec_type = tegra_audio_codec_type_hifi,
+			.device_property = {
+				.num_channels = 2,
+				.bits_per_sample = 16,
+				.rate = 44100,
+				.dac_dap_data_comm_format = dac_dap_data_format_i2s,
+			},
+		},
+		[2] = {
+			.dac_port = tegra_das_port_none,
+			.codec_type = tegra_audio_codec_type_none,
+			.device_property = {
+				.num_channels = 0,
+				.bits_per_sample = 0,
+				.rate = 0,
+				.dac_dap_data_comm_format = 0,
+			},
+		},
+		[3] = {
+			.dac_port = tegra_das_port_none,
+			.codec_type = tegra_audio_codec_type_none,
+			.device_property = {
+				.num_channels = 0,
+				.bits_per_sample = 0,
+				.rate = 0,
+				.dac_dap_data_comm_format = 0,
+			},
+		},
+		[4] = {
+			.dac_port = tegra_das_port_none,
+			.codec_type = tegra_audio_codec_type_none,
+			.device_property = {
+				.num_channels = 0,
+				.bits_per_sample = 0,
+				.rate = 0,
+				.dac_dap_data_comm_format = 0,
+			},
+		},
+	},
+
+	.tegra_das_con_table = {
+		[0] = {
+			.con_id = tegra_das_port_con_id_hifi,
+			.num_entries = 2,
+			.con_line = {
+				[0] = {tegra_das_port_i2s1, tegra_das_port_dap1, true},
+				[1] = {tegra_das_port_dap1, tegra_das_port_i2s1, false},
+			},
+		},
+	}
+};
+
 static void ventana_i2c_init(void)
 {
 	tegra_i2c_device1.dev.platform_data = &ventana_i2c1_platform_data;
@@ -388,6 +456,7 @@ static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_spdif_device,
 	&tegra_avp_device,
 	&tegra_camera,
+	&tegra_das_device,
 };
 
 
@@ -591,6 +660,7 @@ static void __init tegra_ventana_init(void)
 	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata[0];
 	tegra_i2s_device2.dev.platform_data = &tegra_audio_pdata[1];
 	tegra_spdif_device.dev.platform_data = &tegra_spdif_pdata;
+	tegra_das_device.dev.platform_data = &tegra_das_pdata;
 	tegra_ehci2_device.dev.platform_data
 		= &ventana_ehci2_ulpi_platform_data;
 	platform_add_devices(ventana_devices, ARRAY_SIZE(ventana_devices));
