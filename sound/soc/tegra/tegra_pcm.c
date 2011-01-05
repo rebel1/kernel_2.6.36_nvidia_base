@@ -18,6 +18,7 @@
  */
 
 #include "tegra_soc.h"
+#include <mach/tegra_das.h>
 
 #define PLAYBACK_STARTED true
 #define PLAYBACK_STOPPED false
@@ -289,9 +290,6 @@ static snd_pcm_uframes_t tegra_pcm_pointer(struct snd_pcm_substream *substream)
 
 static int tegra_pcm_open(struct snd_pcm_substream *substream)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai_link *machine = rtd->dai;
-	struct snd_soc_dai *cpu_dai = machine->cpu_dai;
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct tegra_runtime_data *prtd;
 	int ret=0;
@@ -304,10 +302,8 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 	runtime->private_data = prtd;
 	prtd->substream = substream;
 
-	/* Enable the DAP outputs */
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP1,TEGRA_TRI_NORMAL);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV1,TEGRA_TRI_NORMAL);
-	tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV2,TEGRA_TRI_NORMAL);
+	/* set pins state to normal */
+	tegra_das_power_mode(true);
 
 	/* Setup I2S clocks */
 	prtd->i2s_clk = i2s_get_clock_by_name(I2S_NAME);
@@ -373,11 +369,8 @@ fail:
 		tegra_dma_free_channel(prtd->dma_chan);
 	}
 
-	if (cpu_dai->active == 0) {
-		tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP1,TEGRA_TRI_TRISTATE);
-		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV1,TEGRA_TRI_TRISTATE);
-		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV2,TEGRA_TRI_TRISTATE);
-	}
+	/* set pins state to tristate */
+	tegra_das_power_mode(false);
 
 	kfree(prtd);
 
@@ -387,9 +380,6 @@ end:
 
 static int tegra_pcm_close(struct snd_pcm_substream *substream)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai_link *machine = rtd->dai;
-	struct snd_soc_dai *cpu_dai = machine->cpu_dai;
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct tegra_runtime_data *prtd = runtime->private_data;
 
@@ -413,13 +403,10 @@ static int tegra_pcm_close(struct snd_pcm_substream *substream)
 		prtd->dma_chan = NULL;
 	}
 
-	kfree(prtd);
+	/* set pins state to tristate */
+	tegra_das_power_mode(false);
 
-	if (cpu_dai->active == 0) {
-		tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP1,TEGRA_TRI_TRISTATE);
-		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV1,TEGRA_TRI_TRISTATE);
-		tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV2,TEGRA_TRI_TRISTATE);
-	}
+	kfree(prtd);
 
 	return 0;
 }

@@ -19,18 +19,7 @@
 
 #include "tegra_soc.h"
 
-static void *das_base = IO_ADDRESS(TEGRA_APB_MISC_BASE);
 struct snd_soc_dai tegra_i2s_dai;
-
-static inline unsigned long das_readl(unsigned long offset)
-{
-	return readl(das_base + offset);
-}
-
-static inline void das_writel(unsigned long value, unsigned long offset)
-{
-	writel(value, das_base + offset);
-}
 
 static int tegra_i2s_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params,
@@ -203,14 +192,14 @@ static int tegra_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 #ifdef CONFIG_PM
 int tegra_i2s_suspend(struct snd_soc_dai *i2s_dai)
 {
-	struct tegra_runtime_data *prtd = (struct snd_pcm_runtime *)(tegra_i2s_dai.private_data);
+	struct tegra_runtime_data *prtd = tegra_i2s_dai.private_data;
 	i2s_get_all_regs(I2S_IFC, &prtd->i2s_regs);
 	return 0;
 }
 
 int tegra_i2s_resume(struct snd_soc_dai *i2s_dai)
 {
-	struct tegra_runtime_data *prtd = (struct snd_pcm_runtime *)(tegra_i2s_dai.private_data);
+	struct tegra_runtime_data *prtd = tegra_i2s_dai.private_data;
 	i2s_set_all_regs(I2S_IFC, &prtd->i2s_regs);
 	return 0;
 }
@@ -235,8 +224,6 @@ static int tegra_i2s_probe(struct platform_device *pdev,
 				struct snd_soc_dai *dai)
 {
 	/* DAC1 -> DAP1, DAC1 master, DAP2 bypass */
-	das_writel(0, APB_MISC_DAS_DAP_CTRL_SEL_0);
-	das_writel(0, APB_MISC_DAS_DAC_INPUT_DATA_CLK_SEL_0);
 	i2s_enable_fifos(I2S_IFC, 0);
 	i2s_set_left_right_control_polarity(I2S_IFC, 0); /* default */
 	i2s_set_master(I2S_IFC, 1); /* set as master */

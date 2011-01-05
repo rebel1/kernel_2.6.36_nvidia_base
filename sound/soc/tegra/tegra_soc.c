@@ -15,9 +15,9 @@
  *
  */
 
-#include "../codecs/wm8903.h"
 #include "tegra_soc.h"
 #include <mach/audio.h>
+#include "../codecs/wm8903.h"
 
 static struct platform_device *tegra_snd_device;
 static int tegra_jack_func;

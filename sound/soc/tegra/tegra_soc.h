@@ -59,9 +59,6 @@
 #define STATE_EXITED 3
 #define STATE_INVALID 4
 
-#define APB_MISC_DAS_DAP_CTRL_SEL_0		0xc00
-#define APB_MISC_DAS_DAC_INPUT_DATA_CLK_SEL_0	0xc40
-
 #define FIFO1 0
 #define FIFO2 1
 
