@@ -216,7 +216,6 @@ static struct platform_device whistler_scroll_device = {
 };
 
 static struct platform_device *whistler_devices[] __initdata = {
-	&tegra_otg_device,
 	&androidusb_device,
 	&debug_uart,
 	&tegra_uartc_device,
