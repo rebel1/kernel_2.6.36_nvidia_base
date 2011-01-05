@@ -13,6 +13,7 @@ obj-y                                   += delay.o
 obj-y                                   += powergate.o
 obj-y                                   += suspend.o
 obj-y                                   += fuse.o
+obj-y                                   += kfuse.o
 ifeq ($(CONFIG_TEGRA_ALSA),y)
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_i2s.o
 else
