@@ -517,8 +517,8 @@ static struct i2c_board_info __initdata i2c_info[] = {
 
 static int __init ventana_touch_init_atmel(void)
 {
-	tegra_gpio_enable(TEGRA_GPIO_PV6);	/* FIXME:  Ventana-specific GPIO assignment     */
-	tegra_gpio_enable(TEGRA_GPIO_PQ7);	/* FIXME:  Ventana-specific GPIO assignment     */
+	tegra_gpio_enable(TEGRA_GPIO_PV6);
+	tegra_gpio_enable(TEGRA_GPIO_PQ7);
 
 	gpio_set_value(TEGRA_GPIO_PQ7, 0);
 	msleep(1);
@@ -640,7 +640,7 @@ static void __init ventana_power_off_init(void)
 static void __init tegra_ventana_init(void)
 {
 	char serial[20];
-#if defined(CONFIG_TOUCHSCREEN_PANJIT_I2C) && \
+#if defined(CONFIG_TOUCHSCREEN_PANJIT_I2C) || \
 	defined(CONFIG_TOUCHSCREEN_ATMEL_MT_T9)
 	struct board_info BoardInfo;
 #endif
@@ -663,30 +663,19 @@ static void __init tegra_ventana_init(void)
 	ventana_charge_init();
 	ventana_regulator_init();
 
-#if defined(CONFIG_TOUCHSCREEN_PANJIT_I2C) && \
+#if defined(CONFIG_TOUCHSCREEN_PANJIT_I2C) || \
 	defined(CONFIG_TOUCHSCREEN_ATMEL_MT_T9)
-
-#define NVODM_ATMEL_TOUCHSCREEN 0x0A00
-#define NVODM_PANJIT_TOUCHSCREEN 0x0000
 
 	tegra_get_board_info(&BoardInfo);
 
-	switch (BoardInfo.sku & 0xFF00) {
-	case NVODM_ATMEL_TOUCHSCREEN:
+	/* boards with sku > 0 have atmel touch panels */
+	if (BoardInfo.sku) {
 		pr_info("Initializing Atmel touch driver\n");
 		ventana_touch_init_atmel();
-		break;
-	default:
+	} else {
 		pr_info("Initializing Panjit touch driver\n");
 		ventana_touch_init_panjit();
-		break;
 	}
-#elif defined(CONFIG_TOUCHSCREEN_ATMEL_MT_T9)
-	pr_info("Initializing Atmel touch driver\n");
-	ventana_touch_init_atmel();
-#elif defined(CONFIG_TOUCHSCREEN_PANJIT_I2C)
-	pr_info("Initializing Panjit touch driver\n");
-	ventana_touch_init_panjit();
 #endif
 
 #ifdef CONFIG_KEYBOARD_GPIO
