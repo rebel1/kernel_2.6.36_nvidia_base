@@ -518,6 +518,21 @@ struct platform_device tegra_spdif_device = {
 	.num_resources	= ARRAY_SIZE(spdif_resource),
 };
 
+static struct resource das_resource[] = {
+	[0] = {
+		.start	= TEGRA_APB_MISC_BASE,
+		.end	= TEGRA_APB_MISC_BASE + TEGRA_APB_MISC_SIZE - 1,
+		.flags	= IORESOURCE_MEM
+	}
+};
+
+struct platform_device tegra_das_device = {
+	.name		= "tegra_das",
+	.id		= -1,
+	.resource	= das_resource,
+	.num_resources	= ARRAY_SIZE(das_resource),
+};
+
 static struct resource tegra_gart_resources[] = {
 	[0] = {
 		.name	= "mc",
