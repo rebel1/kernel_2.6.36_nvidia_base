@@ -18,6 +18,7 @@ else
 obj-y                                   += tegra_i2s_audio.o
 endif
 obj-y                                   += tegra_spdif_audio.o
+obj-y                                   += tegra_das.o
 obj-y                                   += mc.o
 obj-$(CONFIG_USB_SUPPORT)               += usb_phy.o
 obj-$(CONFIG_FIQ)                       += fiq.o
