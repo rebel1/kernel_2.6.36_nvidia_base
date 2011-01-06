@@ -3,7 +3,6 @@ config TEGRA_ALSA
     select TEGRA_PCM
     select TEGRA_I2S
     select TEGRA_IEC
-    select SND_SOC_WM8903
     help
        Say Y if you for ALSA SoC support
 
