@@ -430,7 +430,9 @@
 #define  PE_CURRENT3(x)				(((x) & 0xf) << 24)
 
 #define HDMI_NV_PDISP_KEY_CTRL					0x9a
-#define  LOCAL_KEYS				(1 << 1)
+#define  LOCAL_KEYS				(1 << 0)
+#define  AUTOINC				(1 << 1)
+#define  WRITE16				(1 << 4)
 #define  PKEY_REQUEST_RELOAD_TRIGGER		(1 << 5)
 #define  PKEY_LOADED				(1 << 6)
 #define HDMI_NV_PDISP_KEY_DEBUG0				0x9b

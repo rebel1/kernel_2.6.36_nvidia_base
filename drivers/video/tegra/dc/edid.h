@@ -26,7 +26,6 @@ struct tegra_edid;
 struct tegra_edid *tegra_edid_create(int bus);
 void tegra_edid_destroy(struct tegra_edid *edid);
 
-int tegra_edid_i2c(struct tegra_edid *edid, struct i2c_msg *msg, int msg_len);
 int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs);
 
 #endif

@@ -628,7 +628,8 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 		goto err_free_irq;
 	}
 
-	hdmi->nvhdcp = tegra_nvhdcp_create(hdmi, dc->ndev->id);
+	hdmi->nvhdcp = tegra_nvhdcp_create(hdmi, dc->ndev->id,
+			dc->out->dcc_bus);
 	if (IS_ERR_OR_NULL(hdmi->nvhdcp)) {
 		dev_err(&dc->ndev->dev, "hdmi: can't create nvhdcp\n");
 		err = PTR_ERR(hdmi->nvhdcp);
@@ -1212,10 +1213,4 @@ void tegra_hdmi_writel(struct tegra_dc_hdmi_data *hdmi,
 				     unsigned long val, unsigned long reg)
 {
 	_tegra_hdmi_writel(hdmi, val, reg);
-}
-
-int tegra_hdmi_i2c(struct tegra_dc_hdmi_data *hdmi,
-				struct i2c_msg *msg, int msg_len)
-{
-	return tegra_edid_i2c(hdmi->edid, msg, msg_len);
 }

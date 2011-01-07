@@ -81,11 +81,6 @@ void tegra_edid_debug_add(struct tegra_edid *edid)
 }
 #endif
 
-int tegra_edid_i2c(struct tegra_edid *edid, struct i2c_msg *msg, int msg_len)
-{
-	return i2c_transfer(edid->client->adapter, msg, msg_len);
-}
-
 #ifdef DEBUG
 static char tegra_edid_dump_buff[16 * 1024];
 
