@@ -119,6 +119,7 @@ static void _dump_regs(struct tegra_dc *dc, void *data,
 	char buff[256];
 
 	tegra_dc_io_start(dc);
+	clk_enable(dc->clk);
 
 	DUMP_REG(DC_CMD_DISPLAY_COMMAND_OPTION0);
 	DUMP_REG(DC_CMD_DISPLAY_COMMAND);
@@ -256,6 +257,7 @@ static void _dump_regs(struct tegra_dc *dc, void *data,
 		DUMP_REG(DC_WIN_CSC_KVB);
 	}
 
+	clk_disable(dc->clk);
 	tegra_dc_io_end(dc);
 }
 
@@ -1115,6 +1117,7 @@ static int tegra_dc_probe(struct nvhost_device *ndev)
 	void __iomem *base;
 	int irq;
 	int i;
+	unsigned long emc_clk_rate;
 
 	if (!ndev->dev.platform_data) {
 		dev_err(&ndev->dev, "no platform data\n");
@@ -1171,13 +1174,6 @@ static int tegra_dc_probe(struct nvhost_device *ndev)
 		goto err_put_clk;
 	}
 
-	/*
-	 * The emc is a shared clock, it will be set to the highest
-	 * requested rate from any user.  Set the rate to ULONG_MAX to
-	 * always request the max rate whenever this request is enabled
-	 */
-	clk_set_rate(emc_clk, ULONG_MAX);
-
 	dc->clk = clk;
 	dc->emc_clk = emc_clk;
 	dc->base_res = base_res;
@@ -1185,6 +1181,13 @@ static int tegra_dc_probe(struct nvhost_device *ndev)
 	dc->irq = irq;
 	dc->ndev = ndev;
 	dc->pdata = ndev->dev.platform_data;
+
+	/*
+	 * The emc is a shared clock, it will be set based on
+	 * the requirements for each user on the bus.
+	 */
+	emc_clk_rate = dc->pdata->emc_clk_rate;
+	clk_set_rate(emc_clk, emc_clk_rate ? emc_clk_rate : ULONG_MAX);
 
 	if (dc->pdata->flags & TEGRA_DC_FLAG_ENABLED)
 		dc->enabled = true;

@@ -17,6 +17,14 @@
  *
  */
 
+enum tegra_revision {
+	TEGRA_REVISION_UNKNOWN = 0,
+	TEGRA_REVISION_A02,
+	TEGRA_REVISION_A03,
+	TEGRA_REVISION_A03p,
+	TEGRA_REVISION_MAX,
+};
+
 unsigned long long tegra_chip_uid(void);
 unsigned int tegra_spare_fuse(int bit);
 int tegra_sku_id(void);
@@ -27,3 +35,4 @@ void tegra_init_fuse(void);
 void tegra_init_speedo_data(void);
 u32 tegra_fuse_readl(unsigned long offset);
 void tegra_fuse_writel(u32 value, unsigned long offset);
+enum tegra_revision tegra_get_revision(void);
