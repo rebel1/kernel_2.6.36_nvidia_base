@@ -106,4 +106,7 @@ struct tegra_audio_data {
 	bool is_call_mode;
 };
 
+int tegra_controls_init(struct snd_soc_codec *codec);
+void tegra_controls_exit(void);
+
 #endif
