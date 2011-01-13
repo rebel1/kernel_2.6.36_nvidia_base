@@ -112,7 +112,7 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 		CtrlReg = (0x0<<B06_IN_CM_ENA) |
 			(0x0<<B00_MODE) | (0x0<<B04_IP_SEL_N)
 					| (0x1<<B02_IP_SEL_P);
-		VolumeCtrlReg = (0x5 << B00_IN_VOL);
+		VolumeCtrlReg = (0x1C << B00_IN_VOL);
 		// Mic Setting
 		snd_soc_write(codec, WM8903_ANALOGUE_LEFT_INPUT_1, CtrlReg);
 		snd_soc_write(codec, WM8903_ANALOGUE_RIGHT_INPUT_1, CtrlReg);
