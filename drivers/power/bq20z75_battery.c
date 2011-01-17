@@ -44,6 +44,10 @@ enum {
 	REG_CYCLE_COUNT,
 	REG_CAPACITY,
 	REG_SERIAL_NUMBER,
+	REG_REMAINING_CAPACITY,
+	REG_FULL_CHARGE_CAPACITY,
+	REG_DESIGN_CAPACITY,
+	REG_DESIGN_VOLTAGE,
 	REG_MAX
 };
 
@@ -80,11 +84,15 @@ static struct bq20z75_device_data {
 	[REG_TEMPERATURE]       = BQ20Z75_DATA(TEMP, 0x08, 0, 65535),
 	[REG_VOLTAGE]           = BQ20Z75_DATA(VOLTAGE_NOW, 0x09, 0, 20000),
 	[REG_CURRENT]           = BQ20Z75_DATA(CURRENT_NOW, 0x0A, -32768, 32767),
+	[REG_CAPACITY]          = BQ20Z75_DATA(CAPACITY, 0x0e, 0, 100),
+	[REG_REMAINING_CAPACITY] = BQ20Z75_DATA(ENERGY_NOW, 0x0F, 0, 65535),
+	[REG_FULL_CHARGE_CAPACITY] = BQ20Z75_DATA(ENERGY_FULL, 0x10, 0, 65535),
 	[REG_TIME_TO_EMPTY]     = BQ20Z75_DATA(TIME_TO_EMPTY_AVG, 0x12, 0, 65535),
 	[REG_TIME_TO_FULL]      = BQ20Z75_DATA(TIME_TO_FULL_AVG, 0x13, 0, 65535),
 	[REG_STATUS]            = BQ20Z75_DATA(STATUS, 0x16, 0, 65535),
 	[REG_CYCLE_COUNT]       = BQ20Z75_DATA(CYCLE_COUNT, 0x17, 0, 65535),
-	[REG_CAPACITY]          = BQ20Z75_DATA(CAPACITY, 0x0e, 0, 100),
+	[REG_DESIGN_CAPACITY]   = BQ20Z75_DATA(ENERGY_FULL_DESIGN, 0x18, 0, 65535),
+	[REG_DESIGN_VOLTAGE]    = BQ20Z75_DATA(VOLTAGE_MAX_DESIGN, 0x19, 0, 65535),
 	[REG_SERIAL_NUMBER]     = BQ20Z75_DATA(SERIAL_NUMBER, 0x1C, 0, 65535),
 };
 
@@ -100,7 +108,11 @@ static enum power_supply_property bq20z75_battery_properties[] = {
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG,
 	POWER_SUPPLY_PROP_TIME_TO_FULL_AVG,
-	POWER_SUPPLY_PROP_SERIAL_NUMBER
+	POWER_SUPPLY_PROP_SERIAL_NUMBER,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
+	POWER_SUPPLY_PROP_ENERGY_NOW,
+	POWER_SUPPLY_PROP_ENERGY_FULL,
+	POWER_SUPPLY_PROP_ENERGY_FULL_DESIGN,
 };
 
 static enum power_supply_property bq20z75_ac_properties[] = {
@@ -170,7 +182,8 @@ static int bq20z75_ac_get_property(struct power_supply *psy,
 	return 0;
 }
 
-static int bq20z75_get_health(enum power_supply_property psp,
+static int bq20z75_get_battery_presence_and_health(
+	struct i2c_client *client, enum power_supply_property psp,
 	union power_supply_propval *val)
 {
 	s32 ret;
@@ -178,91 +191,70 @@ static int bq20z75_get_health(enum power_supply_property psp,
 	/* Write to ManufacturerAccess with
 	 * ManufacturerAccess command and then
 	 * read the status */
-	ret = i2c_smbus_write_word_data(bq20z75_device->client,
+	ret = i2c_smbus_write_word_data(client,
 		bq20z75_data[REG_MANUFACTURER_DATA].addr,
 		MANUFACTURER_ACCESS_STATUS);
-	if (ret < 0) {
-		dev_err(&bq20z75_device->client->dev,
-			"%s: i2c write for battery presence "
-			"failed\n", __func__);
-		return -EINVAL;
-	}
+	if (ret < 0)
+		return ret;
 
-	ret = i2c_smbus_read_word_data(bq20z75_device->client,
+
+	ret = i2c_smbus_read_word_data(client,
 		bq20z75_data[REG_MANUFACTURER_DATA].addr);
-	if (ret < 0) {
-		dev_err(&bq20z75_device->client->dev,
-			"%s: i2c read for battery presence "
-			"failed\n", __func__);
-		return -EINVAL;
+	if (ret < 0)
+		return ret;
+
+	if (ret < bq20z75_data[REG_MANUFACTURER_DATA].min_value ||
+	    ret > bq20z75_data[REG_MANUFACTURER_DATA].max_value) {
+		val->intval = 0;
+		return 0;
 	}
 
-	if (ret >= bq20z75_data[REG_MANUFACTURER_DATA].min_value &&
-	    ret <= bq20z75_data[REG_MANUFACTURER_DATA].max_value) {
-
-		/* Mask the upper nibble of 2nd byte and
-		 * lower byte of response then
-		 * shift the result by 8 to get status*/
-		ret &= 0x0F00;
-		ret >>= 8;
-		if (psp == POWER_SUPPLY_PROP_PRESENT) {
-			if (ret == 0x0F)
-				/* battery removed */
-				val->intval = 0;
-			else
-				val->intval = 1;
-		} else if (psp == POWER_SUPPLY_PROP_HEALTH) {
-			if (ret == 0x09)
-				val->intval = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
-			else if (ret == 0x0B)
-				val->intval = POWER_SUPPLY_HEALTH_OVERHEAT;
-			else if (ret == 0x0C)
-				val->intval = POWER_SUPPLY_HEALTH_DEAD;
-			else
-				val->intval = POWER_SUPPLY_HEALTH_GOOD;
-		}
-	} else {
-		val->intval = 0;
+	/* Mask the upper nibble of 2nd byte and
+	 * lower byte of response then
+	 * shift the result by 8 to get status*/
+	ret &= 0x0F00;
+	ret >>= 8;
+	if (psp == POWER_SUPPLY_PROP_PRESENT) {
+		if (ret == 0x0F)
+			/* battery removed */
+			val->intval = 0;
+		else
+			val->intval = 1;
+	} else if (psp == POWER_SUPPLY_PROP_HEALTH) {
+		if (ret == 0x09)
+			val->intval = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+		else if (ret == 0x0B)
+			val->intval = POWER_SUPPLY_HEALTH_OVERHEAT;
+		else if (ret == 0x0C)
+			val->intval = POWER_SUPPLY_HEALTH_DEAD;
+		else
+			val->intval = POWER_SUPPLY_HEALTH_GOOD;
 	}
 
 	return 0;
 }
 
-static int bq20z75_get_psp(int reg_offset, enum power_supply_property psp,
-	union power_supply_propval *val)
+static int bq20z75_get_battery_property(struct i2c_client *client, int reg_offset,
+	enum power_supply_property psp, union power_supply_propval *val)
 {
 	s32 ret;
 	int ac_status;
 
-recheck:
-	ret = i2c_smbus_read_word_data(bq20z75_device->client,
-		bq20z75_data[reg_offset].addr);
+	ret = i2c_smbus_read_word_data(client, bq20z75_data[reg_offset].addr);
 	if (ret < 0) {
-		dev_err(&bq20z75_device->client->dev,
+		dev_err(&client->dev,
 			"%s: i2c read for %d failed\n", __func__, reg_offset);
 		return -EINVAL;
 	}
+
+	/* returned values are 16 bit */
+	if (bq20z75_data[reg_offset].min_value < 0)
+		ret = (s16)ret;
 
 	if (ret >= bq20z75_data[reg_offset].min_value &&
 	    ret <= bq20z75_data[reg_offset].max_value) {
 		val->intval = ret;
 		if (psp == POWER_SUPPLY_PROP_STATUS) {
-			/* mask the upper byte and then find the
-			 * actual status */
-			ret &= 0x00FF;
-
-			/* check the error conditions
-			 * lower nibble represent error
-			 * 0 = no error, so check the remaining bits
-			 * != 0 means error so return */
-			if ((ret & 0x000F) >= 0x01) {
-				val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
-				return 0;
-			}
-
-			while (!(ret & BATTERY_INIT_DONE))
-				goto recheck;
-
 			ac_status = bq20z75_get_ac_status();
 			val->intval = ac_status ?
 				POWER_SUPPLY_STATUS_CHARGING :
@@ -271,44 +263,80 @@ recheck:
 			if (ret & BATTERY_FULL_CHARGED)
 				val->intval = POWER_SUPPLY_STATUS_FULL;
 		}
-		/* bq20z75 provides battery tempreture in 0.1°K
-		 * so convert it to °C */
-		else if (psp == POWER_SUPPLY_PROP_TEMP)
-			val->intval = ret - 2731;
 	} else {
-		val->intval = 0;
 		if (psp == POWER_SUPPLY_PROP_STATUS)
 			val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
+		else
+			val->intval = 0;
 	}
 
 	return 0;
 }
 
-static int bq20z75_get_capacity(union power_supply_propval *val)
+static void  bq20z75_unit_adjustment(struct i2c_client *client,
+	enum power_supply_property psp, union power_supply_propval *val)
+{
+#define BASE_UNIT_CONVERSION		1000
+#define BATTERY_MODE_CAP_MULT_WATT	(10 * BASE_UNIT_CONVERSION)
+#define TIME_UNIT_CONVERSION		600
+#define TEMP_KELVIN_TO_CELCIUS		2731
+	switch (psp) {
+	case POWER_SUPPLY_PROP_ENERGY_NOW:
+	case POWER_SUPPLY_PROP_ENERGY_FULL:
+	case POWER_SUPPLY_PROP_ENERGY_FULL_DESIGN:
+		val->intval *= BATTERY_MODE_CAP_MULT_WATT;
+		break;
+
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
+	case POWER_SUPPLY_PROP_CURRENT_NOW:
+		val->intval *= BASE_UNIT_CONVERSION;
+		break;
+
+	case POWER_SUPPLY_PROP_TEMP:
+		/* bq20z75 provides battery tempreture in 0.1Â°K
+		 * so convert it to 0.1Â°C */
+		val->intval -= TEMP_KELVIN_TO_CELCIUS;
+		break;
+
+	case POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG:
+	case POWER_SUPPLY_PROP_TIME_TO_FULL_AVG:
+		val->intval *= TIME_UNIT_CONVERSION;
+		break;
+
+	default:
+		dev_dbg(&client->dev,
+			"%s: no need for unit conversion %d\n", __func__, psp);
+	}
+}
+
+static int bq20z75_get_battery_capacity(struct i2c_client *client,
+	int reg_offset, enum power_supply_property psp,
+	union power_supply_propval *val)
 {
 	s32 ret;
 
-	ret = i2c_smbus_read_byte_data(bq20z75_device->client,
-		bq20z75_data[REG_CAPACITY].addr);
-	if (ret < 0) {
-		dev_err(&bq20z75_device->client->dev, "%s: i2c read for %d "
-			"failed\n", __func__, REG_CAPACITY);
-		return -EINVAL;
-	}
+	ret = i2c_smbus_read_word_data(client, bq20z75_data[reg_offset].addr);
+	if (ret < 0)
+		return ret;
 
-	/* bq20z75 spec says that this can be >100 %
-	 * even if max value is 100 % */
-	val->intval = ((ret >= 100) ? 100 : ret);
+	if (psp == POWER_SUPPLY_PROP_CAPACITY) {
+		/* bq20z75 spec says that this can be >100 %
+		* even if max value is 100 % */
+		val->intval = min(ret, 100);
+	} else
+		val->intval = ret;
 
 	return 0;
 }
 
 static char bq20z75_serial[5];
-static int bq20z75_get_battery_serial_number(union power_supply_propval *val)
+static int bq20z75_get_battery_serial_number(struct i2c_client *client,
+	union power_supply_propval *val)
 {
 	int ret;
 
-	ret = i2c_smbus_read_word_data(bq20z75_device->client,
+	ret = i2c_smbus_read_word_data(client,
 		bq20z75_data[REG_SERIAL_NUMBER].addr);
 	if (ret < 0)
 		return ret;
@@ -323,27 +351,41 @@ static int bq20z75_bat_get_property(struct power_supply *psy,
 	enum power_supply_property psp,
 	union power_supply_propval *val)
 {
-	u8 count;
+	int count;
+	int ret;
+	struct i2c_client *client = bq20z75_device->client;
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_PRESENT:
 	case POWER_SUPPLY_PROP_HEALTH:
-		if (bq20z75_get_health(psp, val))
-			return -EINVAL;
+		ret = bq20z75_get_battery_presence_and_health(client, psp, val);
+		if (ret)
+			return ret;
 		break;
 
 	case POWER_SUPPLY_PROP_TECHNOLOGY:
 		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
 		break;
 
+	case POWER_SUPPLY_PROP_ENERGY_NOW:
+	case POWER_SUPPLY_PROP_ENERGY_FULL:
+	case POWER_SUPPLY_PROP_ENERGY_FULL_DESIGN:
 	case POWER_SUPPLY_PROP_CAPACITY:
-		if (bq20z75_get_capacity(val))
-			return -EINVAL;
+		for (count = 0; count < ARRAY_SIZE(bq20z75_data); count++) {
+			if (psp == bq20z75_data[count].psp)
+				break;
+		}
+
+		ret = bq20z75_get_battery_capacity(client, count, psp, val);
+		if (ret)
+			return ret;
+
 		break;
 
 	case POWER_SUPPLY_PROP_SERIAL_NUMBER:
-		if (bq20z75_get_battery_serial_number(val))
-			return -EINVAL;
+		ret = bq20z75_get_battery_serial_number(client, val);
+		if (ret)
+			return ret;
 		break;
 
 	case POWER_SUPPLY_PROP_STATUS:
@@ -353,13 +395,16 @@ static int bq20z75_bat_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TEMP:
 	case POWER_SUPPLY_PROP_TIME_TO_EMPTY_AVG:
 	case POWER_SUPPLY_PROP_TIME_TO_FULL_AVG:
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
 		for (count = 0; count < REG_MAX; count++) {
 			if (psp == bq20z75_data[count].psp)
 				break;
 		}
 
-		if (bq20z75_get_psp(count, psp, val))
-			return -EINVAL;
+		ret = bq20z75_get_battery_property(client, count, psp, val);
+		if (ret)
+			return ret;
+
 		break;
 
 	default:
@@ -367,6 +412,12 @@ static int bq20z75_bat_get_property(struct power_supply *psy,
 			"%s: INVALID property\n", __func__);
 		return -EINVAL;
 	}
+
+	/* Convert units to match requirements for power supply class */
+	bq20z75_unit_adjustment(client, psp, val);
+
+	dev_dbg(&client->dev,
+		"%s: property = %d, value = %d\n", __func__, psp, val->intval);
 
 	return 0;
 }
