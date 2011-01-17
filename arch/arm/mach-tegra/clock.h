@@ -164,4 +164,15 @@ void clk_set_cansleep(struct clk *c);
 unsigned long clk_get_rate_locked(struct clk *c);
 void tegra2_sdmmc_tap_delay(struct clk *c, int delay);
 
+#ifdef CONFIG_CPU_FREQ
+struct cpufreq_frequency_table;
+
+struct tegra_cpufreq_table_data {
+	struct cpufreq_frequency_table *freq_table;
+	int throttle_lowest_index;
+	int throttle_highest_index;
+};
+struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void);
+#endif
+
 #endif
