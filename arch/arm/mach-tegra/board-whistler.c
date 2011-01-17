@@ -499,7 +499,7 @@ static void __init tegra_whistler_init(void)
 	tegra_common_init();
 	tegra_clk_init_from_table(whistler_clk_init_table);
 	whistler_pinmux_init();
-
+	whistler_i2c_init();
 	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata[0];
@@ -509,7 +509,6 @@ static void __init tegra_whistler_init(void)
 	tegra_das_device.dev.platform_data = &tegra_das_pdata;
 
 	whistler_sdhci_init();
-	whistler_i2c_init();
 	whistler_regulator_init();
 	whistler_panel_init();
 	whistler_sensors_init();
