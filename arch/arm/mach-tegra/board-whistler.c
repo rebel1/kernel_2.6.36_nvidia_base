@@ -291,15 +291,29 @@ static void whistler_i2c_init(void)
 	platform_device_register(&tegra_i2c_device1);
 }
 
-static struct tegra_audio_platform_data tegra_audio_pdata = {
-	.dma_on	= true,  /* use dma by default */
-	.i2s_clk_rate	= 240000000,
-	.dap_clk	= "clk_dev1",
-	.audio_sync_clk = "audio_2x",
-	.mode		= I2S_BIT_FORMAT_I2S,
-	.fifo_fmt	= I2S_FIFO_16_LSB,
-	.bit_size	= I2S_BIT_SIZE_16,
+static struct tegra_audio_platform_data tegra_audio_pdata[] = {
+	/* For I2S1 */
+	[0] = {
+		.dma_on		= true,  /* use dma by default */
+		.i2s_clk_rate	= 240000000,
+		.dap_clk	= "clk_dev1",
+		.audio_sync_clk = "audio_2x",
+		.mode		= I2S_BIT_FORMAT_I2S,
+		.fifo_fmt	= I2S_FIFO_16_LSB,
+		.bit_size	= I2S_BIT_SIZE_16,
+	},
+	/* For I2S2 */
+	[1] = {
+		.dma_on		= true,  /* use dma by default */
+		.i2s_clk_rate	= 240000000,
+		.dap_clk	= "clk_dev1",
+		.audio_sync_clk = "audio_2x",
+		.mode		= I2S_BIT_FORMAT_I2S,
+		.fifo_fmt	= I2S_FIFO_16_LSB,
+		.bit_size	= I2S_BIT_SIZE_16,
+	}
 };
+
 
 #define GPIO_SCROLL(_pinaction, _gpio, _desc)	\
 {	\
@@ -348,6 +362,7 @@ static struct platform_device *whistler_devices[] __initdata = {
 	&whistler_scroll_device,
 	&tegra_camera,
 	&tegra_i2s_device1,
+	&tegra_i2s_device2,
 	&tegra_das_device,
 };
 
@@ -487,7 +502,8 @@ static void __init tegra_whistler_init(void)
 
 	snprintf(serial, sizeof(serial), "%llx", tegra_chip_uid());
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
-	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata;
+	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata[0];
+	tegra_i2s_device2.dev.platform_data = &tegra_audio_pdata[1];
 	platform_add_devices(whistler_devices, ARRAY_SIZE(whistler_devices));
 
 	tegra_das_device.dev.platform_data = &tegra_das_pdata;
