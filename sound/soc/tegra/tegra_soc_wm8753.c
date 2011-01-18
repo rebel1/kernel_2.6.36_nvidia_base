@@ -1,25 +1,28 @@
-/*
- * tegra_soc_wm8753.c
- *
- * Author: Sachin Nikam
- *         snikam@nvidia.com
- *
- * Copyright (c) 2010, NVIDIA Corporation.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+ /*
+  * tegra_soc_wm8753.c  --  SoC audio for tegra
+  *
+  * Copyright  2011 Nvidia Graphics Pvt. Ltd.
+  *
+  * Author: Sachin Nikam
+  *             snikam@nvidia.com
+  *  http://www.nvidia.com
+  *
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful, but WITHOUT
+  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+  * more details.
+  *
+  * You should have received a copy of the GNU General Public License along
+  * with this program; if not, write to the Free Software Foundation, Inc.,
+  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
+
 
 #include "tegra_soc.h"
 #include "../codecs/wm8753.h"
@@ -45,7 +48,7 @@
 
 static struct platform_device *tegra_snd_device;
 
-extern struct snd_soc_dai tegra_i2s_dai;
+extern struct snd_soc_dai tegra_i2s_dai[];
 extern struct snd_soc_platform tegra_soc_platform;
 
 static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
@@ -54,39 +57,37 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
 	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
-	int ret = 0, value = 0;
+	int err;
+	unsigned int value;
 
-	/* set codec DAI configuration */
-	ret = snd_soc_dai_set_fmt(codec_dai,
-		SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-		SND_SOC_DAIFMT_CBM_CFM);
-	if (ret < 0) {
-		printk(KERN_ERR "codec_dai fmt not set\n");
-		return ret;
+	err = snd_soc_dai_set_fmt(codec_dai,
+					SND_SOC_DAIFMT_I2S |
+					SND_SOC_DAIFMT_NB_NF |
+					SND_SOC_DAIFMT_CBS_CFS);
+	if (err < 0) {
+		pr_err(KERN_ERR "codec_dai fmt not set \n");
+		return err;
 	}
 
-	/* set cpu DAI configuration */
-	ret = snd_soc_dai_set_fmt(cpu_dai,
-		SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-		SND_SOC_DAIFMT_CBM_CFM);
-	if (ret < 0) {
-		printk(KERN_ERR "cpu_dai fmt not set\n");
-		return ret;
+	err = snd_soc_dai_set_fmt(cpu_dai,
+					SND_SOC_DAIFMT_I2S |
+					SND_SOC_DAIFMT_NB_NF |
+					SND_SOC_DAIFMT_CBS_CFS);
+	if (err < 0) {
+		pr_err(KERN_ERR "cpu_dai fmt not set \n");
+		return err;
 	}
 
-	/* set the codec system clock for DAC and ADC */
-	ret = snd_soc_dai_set_sysclk(codec_dai, 0, I2S_CLK,
-		SND_SOC_CLOCK_IN);
-	if (ret < 0) {
-		printk(KERN_ERR "codec_dai clock not set\n");
-		return ret;
+	err = snd_soc_dai_set_sysclk(codec_dai, 0, I2S_CLK, SND_SOC_CLOCK_IN);
+	if (err < 0) {
+		pr_err(KERN_ERR "codec_dai clock not set\n");
+		return err;
 	}
 
-	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, I2S_CLK,
-		SND_SOC_CLOCK_IN);
-	if (ret < 0) {
-		printk(KERN_ERR "cpu_dai clock not set\n");
-		return ret;
+	err = snd_soc_dai_set_sysclk(cpu_dai, 0, I2S_CLK, SND_SOC_CLOCK_IN);
+	if (err < 0) {
+		pr_err(KERN_ERR "cpu_dai clock not set\n");
+		return err;
 	}
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -104,33 +105,24 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 		snd_soc_write(codec_dai->codec, WM8753_PWR4, value);
 
 		value = snd_soc_read(codec_dai->codec, WM8753_LOUTM1);
-		value |= WM8753_LOUTM1_LD2LO | WM8753_LOUTM1_LM2LO |
-				WM8753_LOUTM1_LM2LOVOL;
+		value |= WM8753_LOUTM1_LD2LO;
 		snd_soc_write(codec_dai->codec, WM8753_LOUTM1, value);
 
 		value = snd_soc_read(codec_dai->codec, WM8753_ROUTM1);
-		value |= WM8753_ROUTM1_RD2RO | WM8753_ROUTM1_RM2RO |
-				WM8753_ROUTM1_RM2ROVOL;
+		value |= WM8753_ROUTM1_RD2RO;
 		snd_soc_write(codec_dai->codec, WM8753_ROUTM1, value);
 	}
 
 	return 0;
 }
 
-
 static int tegra_hifi_hw_free(struct snd_pcm_substream *substream)
 {
 	return 0;
 }
 
-static struct snd_soc_ops tegra_hifi_ops = {
-	.hw_params = tegra_hifi_hw_params,
-	.hw_free = tegra_hifi_hw_free,
-};
-
-static int tegra_voice_hw_params(
-	struct snd_pcm_substream *substream,
-	struct snd_pcm_hw_params *params)
+static int tegra_voice_hw_params(struct snd_pcm_substream *substream,
+					struct snd_pcm_hw_params *params)
 {
 	return 0;
 }
@@ -140,54 +132,47 @@ static int tegra_voice_hw_free(struct snd_pcm_substream *substream)
 	return 0;
 }
 
+static struct snd_soc_ops tegra_hifi_ops = {
+	.hw_params = tegra_hifi_hw_params,
+	.hw_free   = tegra_hifi_hw_free,
+};
+
 static struct snd_soc_ops tegra_voice_ops = {
 	.hw_params = tegra_voice_hw_params,
-	.hw_free = tegra_voice_hw_free,
+	.hw_free   = tegra_voice_hw_free,
 };
+
 
 static int tegra_codec_init(struct snd_soc_codec *codec)
 {
 	return tegra_controls_init(codec);
 }
 
-static struct snd_soc_dai bt_dai = {
-	.name = "Bluetooth",
-	.id = 0,
-	.playback = {
-		.channels_min = 1,
-		.channels_max = 1,
-		.rates = SNDRV_PCM_RATE_8000,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE,},
-	.capture = {
-		.channels_min = 1,
-		.channels_max = 1,
-		.rates = SNDRV_PCM_RATE_8000,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE,},
-};
-
 static struct snd_soc_dai_link tegra_soc_dai[] = {
-	{ /* Hifi Playback - for similatious use with voice below */
+	{
 		.name = "WM8753",
 		.stream_name = "WM8753 HiFi",
-		.cpu_dai = &tegra_i2s_dai,
+		.cpu_dai = &tegra_i2s_dai[0],
 		.codec_dai = &wm8753_dai[WM8753_DAI_HIFI],
 		.init = tegra_codec_init,
 		.ops = &tegra_hifi_ops,
 	},
-	{ /* Voice via BT */
-		.name = "Bluetooth",
-		.stream_name = "Voice",
-		.cpu_dai = &bt_dai,
+	{
+		.name = "WM8753",
+		.stream_name = "WM8753 Voice",
+		.cpu_dai = &tegra_i2s_dai[1],
 		.codec_dai = &wm8753_dai[WM8753_DAI_VOICE],
+		.init = tegra_codec_init,
 		.ops = &tegra_voice_ops,
 	},
+
 };
 
 static struct snd_soc_card tegra_snd_soc = {
 	.name = "tegra",
 	.platform = &tegra_soc_platform,
 	.dai_link = tegra_soc_dai,
-	.num_links = 1,
+	.num_links = ARRAY_SIZE(tegra_soc_dai),
 };
 
 static struct snd_soc_device tegra_snd_devdata = {
@@ -236,3 +221,4 @@ module_exit(tegra_exit);
 /* Module information */
 MODULE_DESCRIPTION("Tegra ALSA SoC");
 MODULE_LICENSE("GPL");
+
