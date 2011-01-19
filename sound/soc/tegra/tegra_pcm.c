@@ -232,36 +232,6 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 	/* set pins state to normal */
 	tegra_das_power_mode(true);
 
-	/* Setup I2S clocks */
-	prtd->i2s_clk = i2s_get_clock_by_name(I2S_NAME);
-	if (!prtd->i2s_clk) {
-		pr_err("%s: could not get i2s1 clock\n", __func__);
-		return -EIO;
-	}
-
-	clk_set_rate(prtd->i2s_clk, I2S_CLK);
-	if (clk_enable(prtd->i2s_clk)) {
-		pr_err("%s: failed to enable i2s1 clock\n", __func__);
-		return -EIO;
-	}
-
-	i2s_set_channel_bit_count(I2S_IFC, TEGRA_DEFAULT_SR,
-					clk_get_rate(prtd->i2s_clk));
-
-	prtd->dap_mclk = i2s_get_clock_by_name("clk_dev1");
-	if (!prtd->dap_mclk) {
-		pr_err("%s: could not get DAP clock\n", __func__);
-		return -EIO;
-	}
-	clk_enable(prtd->dap_mclk);
-
-	prtd->audio_sync_clk = i2s_get_clock_by_name("audio_2x");
-	if (!prtd->audio_sync_clk) {
-		pr_err("%s: could not get audio_2x clock\n", __func__);
-		return -EIO;
-	}
-	clk_enable(prtd->audio_sync_clk);
-
 	prtd->state = STATE_INVALID;
 
 	setup_dma_request(substream,

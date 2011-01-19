@@ -25,6 +25,7 @@ struct tegra_i2s_info {
 	struct tegra_audio_platform_data *pdata;
 	struct clk *i2s_clk;
 	struct clk *dap_mclk;
+	struct clk *audio_sync_clk;
 	phys_addr_t i2s_phys;
 	void __iomem *i2s_base;
 
@@ -36,8 +37,7 @@ struct tegra_i2s_info {
 	struct i2s_runtime_data i2s_regs;
 };
 
-
-int setup_dma_request(struct snd_pcm_substream *substream,
+void setup_dma_request(struct snd_pcm_substream *substream,
 			struct tegra_dma_req *req,
 			void (*dma_callback)(struct tegra_dma_req *req),
 			void *dma_data)
@@ -52,21 +52,29 @@ int setup_dma_request(struct snd_pcm_substream *substream,
 			i2s_get_fifo_phy_base(cpu_dai->id, I2S_FIFO_TX);
 		req->dest_wrap = 4;
 		req->source_wrap = 0;
+		if (info->bit_format == TEGRA_AUDIO_BIT_FORMAT_DSP)
+			req->dest_bus_width = info->pdata->dsp_bus_width;
+		else
+			req->dest_bus_width = info->pdata->i2s_bus_width;
+		req->source_bus_width = 32;
 	} else {
 		req->to_memory = true;
 		req->source_addr =
 			i2s_get_fifo_phy_base(cpu_dai->id, I2S_FIFO_RX);
 		req->dest_wrap = 0;
 		req->source_wrap = 4;
+		if (info->bit_format == TEGRA_AUDIO_BIT_FORMAT_DSP)
+			req->source_bus_width = info->pdata->dsp_bus_width;
+		else
+			req->source_bus_width = info->pdata->i2s_bus_width;
+		req->dest_bus_width = 32;
 	}
 
 	req->complete = dma_callback;
 	req->dev = dma_data;
-	req->source_bus_width = 32;
-	req->dest_bus_width = 32;
 	req->req_sel = info->dma_req_sel;
 
-	return 0;
+	return;
 }
 
 
@@ -107,8 +115,7 @@ static int tegra_i2s_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params,
 				struct snd_soc_dai *dai)
 {
-	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct tegra_runtime_data *prtd = runtime->private_data;
+	struct tegra_i2s_info *info = dai->private_data;
 	int ret = 0;
 	int val;
 	unsigned int i2s_id = dai->id;
@@ -144,7 +151,7 @@ static int tegra_i2s_hw_params(struct snd_pcm_substream *substream,
 		goto err;
 	}
 
-	i2s_set_channel_bit_count(i2s_id, val, clk_get_rate(prtd->i2s_clk));
+	i2s_set_channel_bit_count(i2s_id, val, clk_get_rate(info->i2s_clk));
 
 	return 0;
 
@@ -282,6 +289,50 @@ static int tegra_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
 	return ret;
 }
 
+static int i2s_configure(struct tegra_i2s_info *info )
+{
+	struct platform_device *pdev = info->pdev;
+	struct tegra_audio_platform_data *pdata = pdev->dev.platform_data;
+	bool master;
+	struct clk *i2s_clk;
+	int master_clk;
+	unsigned int i2s_id = pdev->id;
+
+	i2s_enable_fifos(i2s_id, 0);
+	i2s_fifo_clear(i2s_id, I2S_FIFO_TX);
+	i2s_fifo_clear(i2s_id, I2S_FIFO_RX);
+	i2s_set_left_right_control_polarity(i2s_id, 0); /* default */
+
+	i2s_clk = clk_get(&pdev->dev, NULL);
+	if (!i2s_clk) {
+		dev_err(&pdev->dev, "%s: could not get i2s clock\n",
+			__func__);
+		return -EIO;
+	}
+
+	if (info->bit_format == TEGRA_AUDIO_BIT_FORMAT_DSP) {
+		master = pdata->dsp_master;
+		master_clk = pdata->dsp_master_clk;
+	} else {
+		master = pdata->i2s_master;
+		master_clk = pdata->i2s_master_clk;
+	}
+
+	if (master && master_clk)
+		i2s_set_channel_bit_count(i2s_id, master_clk,
+						clk_get_rate(i2s_clk));
+	i2s_set_master(i2s_id, master);
+
+	i2s_set_fifo_mode(i2s_id, I2S_FIFO_TX, 1);
+	i2s_set_fifo_mode(i2s_id, I2S_FIFO_RX, 0);
+
+	i2s_set_bit_format(i2s_id, pdata->mode);
+	i2s_set_bit_size(i2s_id, pdata->bit_size);
+	i2s_set_fifo_format(i2s_id, pdata->fifo_fmt);
+
+	return 0;
+}
+
 #ifdef CONFIG_PM
 int tegra_i2s_suspend(struct snd_soc_dai *cpu_dai)
 {
@@ -309,29 +360,28 @@ int tegra_i2s_resume(struct snd_soc_dai *cpu_dai)
 static int tegra_i2s_startup(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
+	struct tegra_i2s_info *info = dai->private_data;
+
+	clk_enable(info->dap_mclk);
+	clk_enable(info->audio_sync_clk);
+
 	return 0;
 }
 
 static void tegra_i2s_shutdown(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
+	struct tegra_i2s_info *info = dai->private_data;
+
+	clk_disable(info->dap_mclk);
+	clk_disable(info->audio_sync_clk);
+
 	return;
 }
 
 static int tegra_i2s_probe(struct platform_device *pdev,
 				struct snd_soc_dai *dai)
 {
-	unsigned int i2s_id = dai->id;
-
-	i2s_enable_fifos(i2s_id, 0);
-	i2s_set_left_right_control_polarity(i2s_id, 0); /* default */
-	i2s_set_master(i2s_id, 1); /* set as master */
-	i2s_set_fifo_mode(i2s_id, FIFO1, 1); /* FIFO1 is TX */
-	i2s_set_fifo_mode(i2s_id, FIFO2, 0); /* FIFO2 is RX */
-	i2s_set_bit_format(i2s_id, I2S_BIT_FORMAT_I2S);
-	i2s_set_bit_size(i2s_id, I2S_BIT_SIZE_16);
-	i2s_set_fifo_format(i2s_id, I2S_FIFO_PACKED);
-
 	return 0;
 }
 
@@ -449,6 +499,23 @@ static int tegra_i2s_driver_probe(struct platform_device *pdev)
 		err = PTR_ERR(info->i2s_clk);
 		goto fail_unmap_mem;
 	}
+
+	info->dap_mclk = i2s_get_clock_by_name(info->pdata->dap_clk);
+	if (IS_ERR(info->dap_mclk)) {
+		err = PTR_ERR(info->dap_mclk);
+		goto fail_unmap_mem;
+	}
+
+	info->audio_sync_clk = i2s_get_clock_by_name(
+					info->pdata->audio_sync_clk);
+	if (IS_ERR(info->audio_sync_clk)) {
+		err = PTR_ERR(info->audio_sync_clk);
+		goto fail_unmap_mem;
+	}
+
+	info->bit_format = TEGRA_AUDIO_BIT_FORMAT_DEFAULT;
+
+	i2s_configure(info);
 
 	for (i = 0; i < ARRAY_SIZE(tegra_i2s_dai); i++) {
 		if (tegra_i2s_dai[i].id == pdev->id) {

@@ -55,22 +55,14 @@
 #include <asm/mach-types.h>
 #include <asm/hardware/scoop.h>
 
-#define STATE_INIT 0
-#define STATE_ABORT 1
-#define STATE_EXIT 2
-#define STATE_EXITED 3
-#define STATE_INVALID 4
+#define STATE_INIT	0
+#define STATE_ABORT	1
+#define STATE_EXIT	2
+#define STATE_EXITED	3
+#define STATE_INVALID	4
 
-#define FIFO1 0
-#define FIFO2 1
-
-#define I2S_IFC			0
-#define I2S_INT			INT_I2S1
-#define I2S_NAME		"i2s1"
-#define I2S_FIFO_TX		FIFO1
 #define I2S_I2S_FIFO_TX_BUSY	I2S_I2S_STATUS_FIFO1_BSY
 #define I2S_I2S_FIFO_TX_QS	I2S_I2S_STATUS_QS_FIFO1
-#define I2S_FIFO_RX		FIFO2
 #define I2S_I2S_FIFO_RX_BUSY	I2S_I2S_STATUS_FIFO2_BSY
 #define I2S_I2S_FIFO_RX_QS	I2S_I2S_STATUS_QS_FIFO2
 
@@ -108,7 +100,7 @@ struct tegra_audio_data {
 int tegra_controls_init(struct snd_soc_codec *codec);
 void tegra_controls_exit(void);
 
-int setup_dma_request(struct snd_pcm_substream *substream,
+void setup_dma_request(struct snd_pcm_substream *substream,
 			struct tegra_dma_req *req,
 			void (*dma_callback)(struct tegra_dma_req *req),
 			void *dma_data);
