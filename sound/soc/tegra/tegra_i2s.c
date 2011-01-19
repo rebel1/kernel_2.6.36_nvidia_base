@@ -257,6 +257,22 @@ static int tegra_i2s_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 static int tegra_i2s_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
 					int clk_id, unsigned int freq, int dir)
 {
+	struct tegra_i2s_info* info = cpu_dai->private_data;
+
+	if (info && info->i2s_clk) {
+		clk_set_rate(info->i2s_clk, freq);
+		if (clk_enable(info->i2s_clk)) {
+			pr_err("%s: failed to enable i2s-%d clock\n", __func__,
+			      cpu_dai->id+1);
+			return -EIO;
+		}
+	}
+	else {
+		pr_err("%s: could not get i2s-%d clock\n", __func__,
+		      cpu_dai->id+1);
+		return -EIO;
+	}
+
 	return 0;
 }
 
