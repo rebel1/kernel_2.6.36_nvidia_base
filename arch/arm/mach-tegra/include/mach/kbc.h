@@ -25,18 +25,16 @@
 
 #include <linux/types.h>
 
-#define KBC_MAX_GPIO 24
-#define KBC_MAX_KPENT 8
+#define KBC_MAX_ROW		16
+#define KBC_MAX_COL		8
+#define KBC_MAX_GPIO		(KBC_MAX_ROW + KBC_MAX_COL)
+#define KBC_MAX_KPRESS_EVENT	8
+#define KBC_MAX_KEY		(KBC_MAX_ROW * KBC_MAX_COL)
 
-#define KBC_MAX_ROW 16
-#define KBC_MAX_COL 8
-
-#define KBC_MAX_KEY (KBC_MAX_ROW*KBC_MAX_COL)
-
-struct tegra_kbc_pin_cfg {
-	bool is_row;
-	bool is_col;
-	unsigned char num;
+enum {
+	kbc_pin_unused = 0,
+	kbc_pin_row,
+	kbc_pin_col,
 };
 
 struct tegra_kbc_wake_key {
@@ -44,15 +42,36 @@ struct tegra_kbc_wake_key {
 	u8 col:4;
 };
 
+struct tegra_kbc_pin_cfg {
+	int pin_type;
+	unsigned char num;
+};
+/**
+ * struct tegra_kbc_platform_data - Tegra kbc specific platform data for kbc
+ *                                  driver.
+ * @debounce_cnt: Debaunce count in terms of clock ticks of 32KHz
+ * @repeat_cnt: The time to start next scan after completing the current scan
+ *              in terms of clock ticks of 32KHz clock
+ * @scan_timeout_cnt: Number of clock count (32KHz) to keep scanning of keys
+ *              after any key is pressed.
+ * @plain_keycode: The key code array for keys in normal mode.
+ * @fn_keycode:  The key code array for keys with function key pressed.
+ * @is_filter_keys: Tells whether filter algorithms applied or not.
+ * @kbc_pin_type: The type of kbc pin whether unused or column or row.
+ * @is_wake_on_any_key: System whouls wakeup on any key or the key list from
+ *                      wake_cfg.
+ * @wake_key_cnt: Number of key count in wakeup list.
+ */
 struct tegra_kbc_platform_data {
 	unsigned int debounce_cnt;
 	unsigned int repeat_cnt;
-	int wake_cnt; /* 0:wake on any key >1:wake on wake_cfg */
+	unsigned int scan_timeout_cnt;
 	int *plain_keycode;
 	int *fn_keycode;
-	int filter_keys;
+	bool is_filter_keys;
 	struct tegra_kbc_pin_cfg pin_cfg[KBC_MAX_GPIO];
+	bool is_wake_on_any_key;
 	struct tegra_kbc_wake_key *wake_cfg;
+	int wake_key_cnt;
 };
 #endif
-
