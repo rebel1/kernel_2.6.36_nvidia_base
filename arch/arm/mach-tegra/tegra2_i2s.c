@@ -240,6 +240,13 @@ int i2s_set_bit_format(int ifc, unsigned fmt)
 	val |= fmt << I2S_BIT_FORMAT_SHIFT;
 
 	i2s_writel(ifc, val, I2S_I2S_CTRL_0);
+
+	if (fmt == I2S_BIT_FORMAT_DSP) {
+		i2s_enable_pcm_mode(ifc, 1);
+	}
+	else {
+		i2s_enable_pcm_mode(ifc, 0);
+	}
 	return 0;
 }
 
@@ -294,6 +301,77 @@ void i2s_set_left_right_control_polarity(int ifc, int high_low)
 	val &= ~I2S_I2S_CTRL_L_R_CTRL;
 	val |= high_low ? I2S_I2S_CTRL_L_R_CTRL : 0;
 	i2s_writel(ifc, val, I2S_I2S_CTRL_0);
+}
+
+void i2s_enable_pcm_mode(int ifc, int on)
+{
+	u32 val;
+
+	check_ifc(ifc);
+
+	val = i2s_readl(ifc, I2S_I2S_PCM_CTRL_0);
+	val &= ~(I2S_I2S_PCM_CTRL_TRM_MODE | I2S_I2S_PCM_CTRL_RCV_MODE);
+	val |= on ? (I2S_I2S_PCM_CTRL_TRM_MODE | I2S_I2S_PCM_CTRL_RCV_MODE) : 0;
+	i2s_writel(ifc, val, I2S_I2S_PCM_CTRL_0);
+}
+
+int i2s_set_pcm_edge_mode(int ifc, unsigned edge_mode)
+{
+	u32 val;
+
+	check_ifc(ifc, -EINVAL);
+
+	if (edge_mode > I2S_I2S_PCM_TRM_EDGE_NEG_EDGE_HIGHZ) {
+		pr_err("%s: invalid dsp edge mode \n", __func__);
+		return -EINVAL;
+	}
+
+	val = i2s_readl(ifc, I2S_I2S_PCM_CTRL_0);
+	val &= ~I2S_I2S_PCM_TRM_EDGE_CTRL_MASK;
+	val |= edge_mode << I2S_PCM_TRM_EDGE_CTRL_SHIFT;
+
+	i2s_writel(ifc, val, I2S_I2S_PCM_CTRL_0);
+	return 0;
+}
+
+int i2s_set_pcm_mask_bits(int ifc, unsigned mask_bits, int tx)
+{
+	u32 val;
+
+	check_ifc(ifc, -EINVAL);
+
+	val = i2s_readl(ifc, I2S_I2S_PCM_CTRL_0);
+	if (tx) {
+		if (mask_bits > I2S_I2S_PCM_TRM_MASK_BITS_SEVEN) {
+			pr_err("%s: invalid dsp mask bits \n", __func__);
+			return -EINVAL;
+		}
+		val &= ~I2S_I2S_PCM_TRM_MASK_BITS_MASK;
+		val |= mask_bits << I2S_PCM_TRM_MASK_BITS_SHIFT;
+	}
+	else {
+		if (mask_bits > I2S_I2S_PCM_RCV_MASK_BITS_SEVEN) {
+			pr_err("%s: invalid dsp mask bits \n", __func__);
+			return -EINVAL;
+		}
+		val &= ~I2S_I2S_PCM_RCV_MASK_BITS_MASK;
+		val |= mask_bits << I2S_PCM_RCV_MASK_BITS_SHIFT;
+	}
+	i2s_writel(ifc, val, I2S_I2S_PCM_CTRL_0);
+	return 0;
+}
+
+void i2s_set_pcm_fsync_width(int ifc, int fsync_long)
+{
+	u32 val;
+
+	check_ifc(ifc);
+
+	val = i2s_readl(ifc, I2S_I2S_PCM_CTRL_0);
+	val &= ~I2S_I2S_PCM_CTRL_FSYNC_PCM_CTRL;
+	val |= fsync_long ? I2S_I2S_PCM_CTRL_FSYNC_PCM_CTRL : 0;
+
+	i2s_writel(ifc, val, I2S_I2S_PCM_CTRL_0);
 }
 
 void i2s_set_fifo_irq_on_err(int ifc, int fifo, int on)
