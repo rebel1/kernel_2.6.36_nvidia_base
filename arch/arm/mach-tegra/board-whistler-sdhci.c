@@ -34,6 +34,8 @@
 #define WHISTLER_WLAN_PWR	TEGRA_GPIO_PK5
 #define WHISTLER_WLAN_RST	TEGRA_GPIO_PK6
 
+#define WHISTLER_EXT_SDCARD_DETECT	TEGRA_GPIO_PI5
+
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
 
@@ -175,7 +177,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data1 = {
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 	.clk_id = NULL,
 	.force_hs = 0,
-	.cd_gpio = -1,
+	.cd_gpio = WHISTLER_EXT_SDCARD_DETECT,
 	.wp_gpio = -1,
 	.power_gpio = -1,
 };
@@ -242,8 +244,21 @@ static int __init whistler_wifi_init(void)
 	platform_device_register(&whistler_wifi_device);
 	return 0;
 }
+
 int __init whistler_sdhci_init(void)
 {
+	int ret;
+
+	ret = gpio_request(WHISTLER_EXT_SDCARD_DETECT, "card_detect");
+	if (ret < 0) {
+		tegra_sdhci_platform_data2.cd_gpio = -1;
+		pr_err("card_detect gpio not found\n");
+	}
+	else {
+		tegra_gpio_enable(WHISTLER_EXT_SDCARD_DETECT);
+		gpio_direction_input(WHISTLER_EXT_SDCARD_DETECT);
+	}
+
 	platform_device_register(&tegra_sdhci_device3);
 	platform_device_register(&tegra_sdhci_device2);
 	platform_device_register(&tegra_sdhci_device1);
