@@ -144,6 +144,7 @@ static struct bq20z75_device_info {
 	struct timer_list	battery_poll_timer;
 	struct i2c_client	*client;
 	int irq;
+	bool battery_present;
 } *bq20z75_device;
 
 static int bq20z75_get_ac_status(void)
@@ -395,8 +396,6 @@ static int bq20z75_probe(struct i2c_client *client,
 	if (!bq20z75_device)
 		return -ENOMEM;
 
-	memset(bq20z75_device, 0, sizeof(*bq20z75_device));
-
 	bq20z75_device->client = client;
 	flags = bq20z75_device->client->flags;
 	bq20z75_device->client->flags &= ~I2C_M_IGNORE_NAK;
@@ -407,6 +406,8 @@ static int bq20z75_probe(struct i2c_client *client,
 		dev_err(&bq20z75_device->client->dev,
 			"%s: no battery present(%d)\n", __func__, rc);
 		supply_index = SUPPLY_TYPE_AC;
+	} else {
+		bq20z75_device->battery_present = true;
 	}
 
 	bq20z75_device->client->flags = flags;
@@ -434,10 +435,12 @@ static int bq20z75_probe(struct i2c_client *client,
 		}
 	}
 
-	setup_timer(&bq20z75_device->battery_poll_timer,
-		battery_poll_timer_func, 0);
-	mod_timer(&bq20z75_device->battery_poll_timer,
-		jiffies + msecs_to_jiffies(BATTERY_POLL_PERIOD));
+	if (bq20z75_device->battery_present) {
+		setup_timer(&bq20z75_device->battery_poll_timer,
+			battery_poll_timer_func, 0);
+		mod_timer(&bq20z75_device->battery_poll_timer,
+			jiffies + msecs_to_jiffies(BATTERY_POLL_PERIOD));
+	}
 
 	dev_info(&bq20z75_device->client->dev, "driver registered\n");
 	return 0;
@@ -453,13 +456,16 @@ fail_irq:
 
 static int bq20z75_remove(struct i2c_client *client)
 {
-	struct bq20z75_device_info *bq20z75_device;
-	int i;
+	struct bq20z75_device_info *bq20z75_device =
+		i2c_get_clientdata(client);
+	int supply_index = 0, i;
 
-	bq20z75_device = i2c_get_clientdata(client);
-	del_timer_sync(&bq20z75_device->battery_poll_timer);
+	if (bq20z75_device->battery_present)
+		del_timer_sync(&bq20z75_device->battery_poll_timer);
+	else
+		supply_index = SUPPLY_TYPE_AC;
 
-	for (i = 0; i < ARRAY_SIZE(bq20z75_supply); i++)
+	for (i = supply_index; i < ARRAY_SIZE(bq20z75_supply); i++)
 		power_supply_unregister(&bq20z75_supply[i]);
 
 	kfree(bq20z75_device);
@@ -472,9 +478,12 @@ static int bq20z75_suspend(struct i2c_client *client,
 	pm_message_t state)
 {
 	s32 ret;
-	struct bq20z75_device_info *bq20z75_device;
+	struct bq20z75_device_info *bq20z75_device =
+		i2c_get_clientdata(client);
 
-	bq20z75_device = i2c_get_clientdata(client);
+	if (!bq20z75_device->battery_present)
+		return 0;
+
 	del_timer_sync(&bq20z75_device->battery_poll_timer);
 
 	/* write to manufacture access with sleep command */
@@ -494,6 +503,12 @@ static int bq20z75_suspend(struct i2c_client *client,
 /* any smbus transaction will wake up bq20z75 */
 static int bq20z75_resume(struct i2c_client *client)
 {
+	struct bq20z75_device_info *bq20z75_device =
+		i2c_get_clientdata(client);
+
+	if (!bq20z75_device->battery_present)
+		return 0;
+
 	setup_timer(&bq20z75_device->battery_poll_timer,
 		battery_poll_timer_func, 0);
 	mod_timer(&bq20z75_device->battery_poll_timer,
