@@ -46,7 +46,7 @@ static irqreturn_t carddetect_irq(int irq, void *data)
 {
 	struct sdhci_host *sdhost = (struct sdhci_host *)data;
 
-	sdhci_card_detect_callback(sdhost);
+	tasklet_schedule(&sdhost->card_tasklet);
 	return IRQ_HANDLED;
 };
 
