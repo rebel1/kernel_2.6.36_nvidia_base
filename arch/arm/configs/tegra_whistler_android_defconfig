@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.36.3
-# Wed Jan 19 15:47:56 2011
+# Thu Jan 27 16:46:19 2011
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -931,6 +931,7 @@ CONFIG_KERNEL_DEBUGGER_CORE=y
 # CONFIG_WL127X_RFKILL is not set
 # CONFIG_APANIC is not set
 CONFIG_BCM4329_RFKILL=y
+# CONFIG_TEGRA_CRYPTO_DEV is not set
 # CONFIG_C2PORT is not set
 
 #
@@ -1585,6 +1586,7 @@ CONFIG_TEGRA_NVMAP=y
 CONFIG_NVMAP_RECLAIM_UNPINNED_VM=y
 CONFIG_NVMAP_ALLOW_SYSMEM=y
 # CONFIG_NVMAP_HIGHMEM_ONLY is not set
+# CONFIG_NVMAP_CARVEOUT_KILLER is not set
 CONFIG_BACKLIGHT_LCD_SUPPORT=y
 CONFIG_LCD_CLASS_DEVICE=y
 # CONFIG_LCD_L4F00242T03 is not set
@@ -2064,7 +2066,7 @@ CONFIG_IIO=y
 # Light sensors
 #
 # CONFIG_SENSORS_TSL2563 is not set
-# CONFIG_ISL29018 is not set
+CONFIG_ISL29018=y
 
 #
 # Magnetometer sensors
