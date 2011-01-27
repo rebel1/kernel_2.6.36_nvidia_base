@@ -518,8 +518,8 @@ static struct class_interface rtc_alarm_interface = {
 };
 
 static struct platform_driver alarm_driver = {
-	.suspend = NULL,
-	.resume = NULL,
+	.suspend = alarm_suspend,
+	.resume = alarm_resume,
 	.driver = {
 		.name = "alarm"
 	}
