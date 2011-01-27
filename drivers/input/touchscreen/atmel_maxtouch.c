@@ -1782,7 +1782,7 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	snprintf(mxt->phys_name,
 		 sizeof(mxt->phys_name), "%s/input0", dev_name(&client->dev)
 	    );
-	input->name = "Atmel maXTouch Touchscreen controller";
+	input->name = "atmel-maxtouch";
 	input->phys = mxt->phys_name;
 	input->id.bustype = BUS_I2C;
 	input->dev.parent = &client->dev;
