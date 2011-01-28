@@ -64,6 +64,7 @@
 #include "devices.h"
 #include "gpio-names.h"
 #include "fuse.h"
+#include "wakeups-t2.h"
 
 static struct usb_mass_storage_platform_data tegra_usb_fsg_platform = {
 	.vendor = "NVIDIA",
@@ -416,9 +417,20 @@ static struct gpio_keys_button ventana_keys[] = {
 	[6] = GPIO_KEY(KEY_MENU, PC7, 0),
 };
 
+#define PMC_WAKE_STATUS 0x14
+
+static int ventana_wakeup_key(void)
+{
+	unsigned long status =
+		readl(IO_ADDRESS(TEGRA_PMC_BASE) + PMC_WAKE_STATUS);
+
+	return status & TEGRA_WAKE_GPIO_PV2 ? KEY_POWER : KEY_RESERVED;
+}
+
 static struct gpio_keys_platform_data ventana_keys_platform_data = {
 	.buttons	= ventana_keys,
 	.nbuttons	= ARRAY_SIZE(ventana_keys),
+	.wakeup_key	= ventana_wakeup_key,
 };
 
 static struct platform_device ventana_keys_device = {
