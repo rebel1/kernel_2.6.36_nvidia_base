@@ -11,7 +11,6 @@ ccflags-y += -Iarch/arm/mach-tegra/nv/include
 
 
 obj-$(CONFIG_TEGRA_NVRM)	+= nvrm_user.o
-obj-$(CONFIG_TEGRA_NVRM)	+= nvrpc_user.o
 obj-$(CONFIG_TEGRA_NVRM)	+= nvrm/
 obj-$(CONFIG_TEGRA_NVRM)	+= nvreftrack/
 
