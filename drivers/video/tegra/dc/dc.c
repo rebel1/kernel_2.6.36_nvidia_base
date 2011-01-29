@@ -1124,16 +1124,16 @@ static void tegra_dc_init(struct tegra_dc *dc)
 
 static bool _tegra_dc_enable(struct tegra_dc *dc)
 {
-	if (!dc->out)
-		return false;
-
-	if (dc->out->enable)
-		dc->out->enable();
-
 	if (dc->mode.pclk == 0)
 		return false;
 
+	if (!dc->out)
+		return false;
+
 	tegra_dc_io_start(dc);
+
+	if (dc->out->enable)
+		dc->out->enable();
 
 	tegra_dc_setup_clk(dc, dc->clk);
 
