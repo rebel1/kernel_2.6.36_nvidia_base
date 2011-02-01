@@ -148,7 +148,7 @@ end:
 
 static int tegra_kbc_keycode(struct tegra_kbc *kbc, int r, int c, bool fn_key)
 {
-	int code_index = kbc->row_seq[r] * kbc->ncols + kbc->col_seq[r];
+	int code_index = kbc->row_seq[r] * kbc->ncols + kbc->col_seq[c];
 	if (!fn_key)
 		return kbc->plain_keycode[code_index];
 	else
