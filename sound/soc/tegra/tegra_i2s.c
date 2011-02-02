@@ -119,6 +119,7 @@ static int tegra_i2s_hw_params(struct snd_pcm_substream *substream,
 	int ret = 0;
 	int val;
 	unsigned int i2s_id = dai->id;
+	unsigned int rate;
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
@@ -151,7 +152,11 @@ static int tegra_i2s_hw_params(struct snd_pcm_substream *substream,
 		goto err;
 	}
 
-	i2s_set_channel_bit_count(i2s_id, val, clk_get_rate(info->i2s_clk));
+	rate = clk_get_rate(info->i2s_clk);
+	if (info->bit_format == TEGRA_AUDIO_BIT_FORMAT_DSP)
+		rate *= 2;
+
+	i2s_set_channel_bit_count(i2s_id, val, rate);
 
 	return 0;
 
@@ -181,8 +186,6 @@ static int tegra_i2s_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 	default:
 		return -EINVAL;
 	}
-
-	i2s_set_master(i2s_id, val1);
 
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_DSP_A:
@@ -258,9 +261,10 @@ static int tegra_i2s_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
 					int clk_id, unsigned int freq, int dir)
 {
 	struct tegra_i2s_info* info = cpu_dai->private_data;
+	struct tegra_audio_platform_data *pdata = info->pdev->dev.platform_data;
 
 	if (info && info->i2s_clk) {
-		clk_set_rate(info->i2s_clk, freq);
+		clk_set_rate(info->i2s_clk, pdata->i2s_clk_rate);
 		if (clk_enable(info->i2s_clk)) {
 			pr_err("%s: failed to enable i2s-%d clock\n", __func__,
 			      cpu_dai->id+1);
@@ -309,10 +313,9 @@ static int i2s_configure(struct tegra_i2s_info *info )
 {
 	struct platform_device *pdev = info->pdev;
 	struct tegra_audio_platform_data *pdata = pdev->dev.platform_data;
-	bool master;
 	struct clk *i2s_clk;
-	int master_clk;
 	unsigned int i2s_id = pdev->id;
+	unsigned int rate;
 
 	i2s_enable_fifos(i2s_id, 0);
 	i2s_fifo_clear(i2s_id, I2S_FIFO_TX);
@@ -326,18 +329,14 @@ static int i2s_configure(struct tegra_i2s_info *info )
 		return -EIO;
 	}
 
-	if (info->bit_format == TEGRA_AUDIO_BIT_FORMAT_DSP) {
-		master = pdata->dsp_master;
-		master_clk = pdata->dsp_master_clk;
-	} else {
-		master = pdata->i2s_master;
-		master_clk = pdata->i2s_master_clk;
-	}
+	rate = clk_get_rate(i2s_clk);
+	if (info->bit_format == TEGRA_AUDIO_BIT_FORMAT_DSP)
+		rate *= 2;
 
-	if (master && master_clk)
-		i2s_set_channel_bit_count(i2s_id, master_clk,
-						clk_get_rate(i2s_clk));
-	i2s_set_master(i2s_id, master);
+	if (pdata->i2s_master && pdata->i2s_master_clk)
+		i2s_set_channel_bit_count(i2s_id, pdata->i2s_master_clk, rate);
+
+	i2s_set_master(i2s_id, pdata->i2s_master);
 
 	i2s_set_fifo_mode(i2s_id, I2S_FIFO_TX, 1);
 	i2s_set_fifo_mode(i2s_id, I2S_FIFO_RX, 0);
@@ -515,6 +514,7 @@ static int tegra_i2s_driver_probe(struct platform_device *pdev)
 		err = PTR_ERR(info->i2s_clk);
 		goto fail_unmap_mem;
 	}
+	clk_set_rate(info->i2s_clk, info->pdata->i2s_clk_rate);
 
 	info->dap_mclk = i2s_get_clock_by_name(info->pdata->dap_clk);
 	if (IS_ERR(info->dap_mclk)) {
@@ -530,6 +530,8 @@ static int tegra_i2s_driver_probe(struct platform_device *pdev)
 	}
 
 	info->bit_format = TEGRA_AUDIO_BIT_FORMAT_DEFAULT;
+	if (info->pdata->mode == I2S_BIT_FORMAT_DSP)
+		info->bit_format = TEGRA_AUDIO_BIT_FORMAT_DSP;
 
 	i2s_configure(info);
 
