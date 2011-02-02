@@ -283,10 +283,8 @@ static struct tegra_audio_platform_data tegra_audio_pdata[] = {
 	/* For I2S1 */
 	[0] = {
 		.i2s_master	= true,
-		.dsp_master	= false,
 		.dma_on		= true,  /* use dma by default */
 		.i2s_master_clk = 44100,
-		.dsp_master_clk = 8000,
 		.i2s_clk_rate	= 240000000,
 		.dap_clk	= "clk_dev1",
 		.audio_sync_clk = "audio_2x",
@@ -298,12 +296,11 @@ static struct tegra_audio_platform_data tegra_audio_pdata[] = {
 	},
 	/* For I2S2 */
 	[1] = {
-		.i2s_master	= false,
-		.dsp_master	= true,
+		.i2s_master	= true,
 		.dma_on		= true,  /* use dma by default */
-		.i2s_master_clk = 44100,
+		.i2s_master_clk = 8000,
 		.dsp_master_clk = 8000,
-		.i2s_clk_rate	= 240000000,
+		.i2s_clk_rate	= 2000000,
 		.dap_clk	= "clk_dev1",
 		.audio_sync_clk = "audio_2x",
 		.mode		= I2S_BIT_FORMAT_DSP,
@@ -372,10 +369,12 @@ static struct tegra_das_platform_data tegra_das_pdata = {
 	.tegra_das_con_table = {
 		[0] = {
 			.con_id = tegra_das_port_con_id_hifi,
-			.num_entries = 2,
+			.num_entries = 4,
 			.con_line = {
 				[0] = {tegra_das_port_i2s1, tegra_das_port_dap1, true},
 				[1] = {tegra_das_port_dap1, tegra_das_port_i2s1, false},
+				[2] = {tegra_das_port_i2s2, tegra_das_port_dap4, true},
+				[3] = {tegra_das_port_dap4, tegra_das_port_i2s2, false},
 			},
 		},
 	}
