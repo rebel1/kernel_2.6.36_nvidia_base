@@ -747,6 +747,18 @@ static int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode
 	tegra_dc_writel(dc, DE_SELECT_ACTIVE | DE_CONTROL_NORMAL,
 			DC_DISP_DATA_ENABLE_OPTIONS);
 
+	val = tegra_dc_readl(dc, DC_COM_PIN_OUTPUT_POLARITY1);
+	if (mode->flags & TEGRA_DC_MODE_FLAG_NEG_V_SYNC)
+		val |= PIN1_LVS_OUTPUT;
+	else
+		val &= ~PIN1_LVS_OUTPUT;
+
+	if (mode->flags & TEGRA_DC_MODE_FLAG_NEG_H_SYNC)
+		val |= PIN1_LHS_OUTPUT;
+	else
+		val &= ~PIN1_LHS_OUTPUT;
+	tegra_dc_writel(dc, val, DC_COM_PIN_OUTPUT_POLARITY1);
+
 	/* TODO: MIPI/CRT/HDMI clock cals */
 
 	val = DISP_DATA_FORMAT_DF1P1C;
@@ -887,6 +899,23 @@ static void tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 
 }
 
+unsigned tegra_dc_get_out_height(struct tegra_dc *dc)
+{
+	if (dc->out)
+		return dc->out->height;
+	else
+		return 0;
+}
+EXPORT_SYMBOL(tegra_dc_get_out_height);
+
+unsigned tegra_dc_get_out_width(struct tegra_dc *dc)
+{
+	if (dc->out)
+		return dc->out->width;
+	else
+		return 0;
+}
+EXPORT_SYMBOL(tegra_dc_get_out_width);
 
 static irqreturn_t tegra_dc_irq(int irq, void *ptr)
 {
@@ -1186,8 +1215,9 @@ static void tegra_dc_reset_worker(struct work_struct *work)
 	mutex_lock(&dc->lock);
 	_tegra_dc_disable(dc);
 
+	msleep(100);
 	tegra_periph_reset_assert(dc->clk);
-	msleep(10);
+	msleep(100);
 	tegra_periph_reset_deassert(dc->clk);
 
 	_tegra_dc_enable(dc);
