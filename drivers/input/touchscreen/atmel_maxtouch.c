@@ -1984,12 +1984,26 @@ static int __devexit mxt_remove(struct i2c_client *client)
 }
 
 #if defined(CONFIG_PM)
+static void mxt_start(struct mxt_data *mxt)
+{
+	mxt_write_byte(mxt->client,
+		MXT_BASE_ADDR(MXT_TOUCH_MULTITOUCHSCREEN_T9, mxt), 0x83);
+}
+
+static void mxt_stop(struct mxt_data *mxt)
+{
+	mxt_write_byte(mxt->client,
+		MXT_BASE_ADDR(MXT_TOUCH_MULTITOUCHSCREEN_T9, mxt), 0x0);
+}
+
 static int mxt_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	struct mxt_data *mxt = i2c_get_clientdata(client);
 
 	if (device_may_wakeup(&client->dev))
 		enable_irq_wake(mxt->irq);
+	else
+		mxt_stop(mxt);
 
 	return 0;
 }
@@ -2000,6 +2014,8 @@ static int mxt_resume(struct i2c_client *client)
 
 	if (device_may_wakeup(&client->dev))
 		disable_irq_wake(mxt->irq);
+	else
+		mxt_start(mxt);
 
 	return 0;
 }
