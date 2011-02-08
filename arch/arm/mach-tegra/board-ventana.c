@@ -228,6 +228,7 @@ static struct platform_device androidusb_device = {
 static struct i2c_board_info __initdata ventana_i2c_bus1_board_info[] = {
 	{
 		I2C_BOARD_INFO("wm8903", 0x1a),
+		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PX3),
 	},
 };
 
@@ -711,6 +712,7 @@ static void __init tegra_ventana_init(void)
 	ventana_kbc_init();
 #endif
 
+	ventana_wired_jack_init();
 	ventana_usb_init();
 	ventana_gps_init();
 	ventana_panel_init();

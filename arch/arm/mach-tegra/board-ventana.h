@@ -22,6 +22,7 @@ int ventana_regulator_init(void);
 int ventana_sdhci_init(void);
 int ventana_pinmux_init(void);
 int ventana_panel_init(void);
+int ventana_wired_jack_init(void);
 int ventana_sensors_init(void);
 int ventana_kbc_init(void);
 int ventana_emc_init(void);
