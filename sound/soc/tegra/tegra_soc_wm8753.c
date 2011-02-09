@@ -296,20 +296,19 @@ static int tegra_voice_hw_params(struct snd_pcm_substream *substream,
 					   SND_SOC_DAIFMT_CBS_CFS);
 
 	if (err < 0) {
-		  pr_err("cpu_dai fmt not set \n");
+		  pr_err("%s:cpu_dai fmt not set \n", __func__);
 		  return err;
 	}
 
 	err = snd_soc_dai_set_sysclk(cpu_dai, 0, I2S2_CLK, SND_SOC_CLOCK_IN);
 
 	if (err < 0) {
-		  pr_err("cpu_dai clock not set\n");
+		  pr_err("%s:cpu_dai clock not set\n", __func__);
 		  return err;
 	}
 
 	return 0;
 }
-
 
 static int tegra_voice_hw_free(struct snd_pcm_substream *substream)
 {
@@ -342,14 +341,13 @@ static struct snd_soc_dai_link tegra_soc_dai[] = {
 		.ops = &tegra_hifi_ops,
 	},
 	{
-		.name = "WM8753",
-		.stream_name = "WM8753 Voice",
+		.name = "Tegra-generic",
+		.stream_name = "Tegra Generic Voice",
 		.cpu_dai = &tegra_i2s_dai[1],
 		.codec_dai = &tegra_generic_codec_dai[0],
 		.init = tegra_codec_init,
 		.ops = &tegra_voice_ops,
 	},
-
 };
 
 static struct snd_soc_card tegra_snd_soc = {
