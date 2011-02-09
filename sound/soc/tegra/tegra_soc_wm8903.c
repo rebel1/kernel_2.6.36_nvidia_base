@@ -55,7 +55,6 @@ extern struct snd_soc_platform tegra_soc_platform;
 #define R29_DRC_1		41
 #define SET_REG_VAL(r,m,l,v) (((r)&(~((m)<<(l))))|(((v)&(m))<<(l)))
 
-
 static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
 {
@@ -74,7 +73,7 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 					SND_SOC_DAIFMT_NB_NF | \
 					SND_SOC_DAIFMT_CBS_CFS);
 	if (err < 0) {
-		printk(KERN_ERR "codec_dai fmt not set \n");
+		pr_err("codec_dai fmt not set \n");
 		return err;
 	}
 
@@ -83,19 +82,19 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 					SND_SOC_DAIFMT_NB_NF | \
 					SND_SOC_DAIFMT_CBS_CFS);
 	if (err < 0) {
-		printk(KERN_ERR "cpu_dai fmt not set \n");
+		pr_err("cpu_dai fmt not set \n");
 		return err;
 	}
 
 	err = snd_soc_dai_set_sysclk(codec_dai, 0, I2S1_CLK, SND_SOC_CLOCK_IN);
 	if (err < 0) {
-		printk(KERN_ERR "codec_dai clock not set\n");
+		pr_err("codec_dai clock not set\n");
 		return err;
 	}
 
 	err = snd_soc_dai_set_sysclk(cpu_dai, 0, I2S1_CLK, SND_SOC_CLOCK_IN);
 	if (err < 0) {
-		printk(KERN_ERR "cpu_dai clock not set\n");
+		pr_err("cpu_dai clock not set\n");
 		return err;
 	}
 

@@ -20,11 +20,8 @@
 
 
 #include "tegra_soc.h"
-#include <mach/audio.h>
 
-static struct tegra_audio_data *audio_data;
-static int tegra_jack_func;
-static int tegra_spk_func;
+#include <mach/audio.h>
 
 #define TEGRA_HP	0
 #define TEGRA_MIC	1
@@ -33,6 +30,10 @@ static int tegra_spk_func;
 #define TEGRA_HP_OFF	4
 #define TEGRA_SPK_ON	0
 #define TEGRA_SPK_OFF	1
+
+static struct tegra_audio_data *audio_data;
+static int tegra_jack_func;
+static int tegra_spk_func;
 
 static void tegra_ext_control(struct snd_soc_codec *codec)
 {
@@ -427,6 +428,11 @@ int tegra_controls_init(struct snd_soc_codec *codec)
 		if (err < 0)
 			goto fail;
 
+		/* Add jack detection */
+		err = tegra_jack_init(codec);
+		if (err < 0)
+			goto fail;
+
 		/* Default to HP output */
 		tegra_jack_func = TEGRA_HP;
 		tegra_spk_func = TEGRA_SPK_ON;
@@ -436,6 +442,7 @@ int tegra_controls_init(struct snd_soc_codec *codec)
 	}
 
 	return 0;
+
 fail:
 	if (audio_data) {
 		kfree(audio_data);
@@ -446,6 +453,8 @@ fail:
 
 void tegra_controls_exit(void)
 {
+	tegra_jack_exit();
+
 	if (audio_data) {
 		kfree(audio_data);
 		audio_data = 0;

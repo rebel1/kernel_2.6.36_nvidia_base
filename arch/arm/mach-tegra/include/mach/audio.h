@@ -54,4 +54,10 @@ struct tegra_audio_platform_data {
 	void *driver_data;
 };
 
+struct tegra_wired_jack_conf {
+	int hp_det_n;   /* headphone jack detection gpio pin */
+	int en_mic_ext; /* external mic enable gpio pin */
+	int en_mic_int; /* internal mic enable gpio pin */
+};
+
 #endif /* __ARCH_ARM_MACH_TEGRA_AUDIO_H */

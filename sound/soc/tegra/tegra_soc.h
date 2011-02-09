@@ -102,6 +102,9 @@ struct tegra_audio_data {
 int tegra_controls_init(struct snd_soc_codec *codec);
 void tegra_controls_exit(void);
 
+int tegra_jack_init(struct snd_soc_codec *codec);
+void tegra_jack_exit(void);
+
 void setup_dma_request(struct snd_pcm_substream *substream,
 			struct tegra_dma_req *req,
 			void (*dma_callback)(struct tegra_dma_req *req),
