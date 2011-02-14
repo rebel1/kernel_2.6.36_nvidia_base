@@ -32,6 +32,7 @@
 
 #define USB_CDC_PROTO_EEM			7
 
+#define NCM_DATA_CLASS_PROTOCOCL_CODE		0x01
 /*-------------------------------------------------------------------------*/
 
 /*

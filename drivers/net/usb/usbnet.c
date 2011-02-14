@@ -43,6 +43,7 @@
 #include <linux/mii.h>
 #include <linux/usb.h>
 #include <linux/usb/usbnet.h>
+#include <linux/usb/cdc.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/pm_runtime.h>
@@ -100,6 +101,7 @@ int usbnet_get_endpoints(struct usbnet *dev, struct usb_interface *intf)
 	struct usb_host_interface	*alt = NULL;
 	struct usb_host_endpoint	*in = NULL, *out = NULL;
 	struct usb_host_endpoint	*status = NULL;
+	struct cdc_state		*info = (struct cdc_state *)&dev->data;
 
 	for (tmp = 0; tmp < intf->num_altsetting; tmp++) {
 		unsigned	ep;
@@ -114,6 +116,10 @@ int usbnet_get_endpoints(struct usbnet *dev, struct usb_interface *intf)
 		for (ep = 0; ep < alt->desc.bNumEndpoints; ep++) {
 			struct usb_host_endpoint	*e;
 			int				intr = 0;
+
+			if (info->ncm && alt->desc.bInterfaceProtocol !=
+			NCM_DATA_CLASS_PROTOCOCL_CODE)
+				continue;
 
 			e = alt->endpoint + ep;
 			switch (e->desc.bmAttributes) {

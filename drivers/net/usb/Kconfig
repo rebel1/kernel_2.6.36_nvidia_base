@@ -196,6 +196,24 @@ config USB_NET_CDC_EEM
 	  IEEE 802 "local assignment" bit is set in the address, a "usbX"
 	  name is used instead.
 
+config USB_NET_CDCNCM
+	tristate "CDC NCM support (smart devices such as HSDPA and LTE modems)"
+	depends on USB_USBNET
+	select USB_NET_CDCETHER
+	default y
+	help
+	  This option supports devices conforming to the Communication Device
+	  Class (CDC) Network Control Model. The CDC specifications are
+	  available from <http://www.usb.org/>.
+
+	  This driver should work with at least the following devices:
+
+	    * Ericsson Mobile Broadband Module (M570, F5521gw)
+	    * ...
+
+	  This driver creates an interface named "ncmX", where X depends on
+	  what other networking devices you have in use.
+
 config USB_NET_DM9601
 	tristate "Davicom DM9601 based USB 1.1 10/100 ethernet devices"
 	depends on USB_USBNET
