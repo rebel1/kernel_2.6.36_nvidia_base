@@ -34,8 +34,6 @@
 
 #define TEGRA_USB_DMA_ALIGN 32
 
-#define URB_ALIGNED_TEMP_BUFFER 0x80000000
-
 struct tegra_ehci_context {
 	bool valid;
 	u32 command;
@@ -589,13 +587,14 @@ static void free_temp_buffer(struct urb *urb)
 	dir = usb_urb_dir_in(urb) ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 
 	temp = container_of(urb->transfer_buffer, struct temp_buffer,
-								data);
+			    data);
 
 	if (dir == DMA_FROM_DEVICE)
 		memcpy(temp->old_xfer_buffer, temp->data,
-			urb->transfer_buffer_length);
+		       urb->transfer_buffer_length);
 	urb->transfer_buffer = temp->old_xfer_buffer;
 	kfree(temp->kmalloc_ptr);
+
 	urb->transfer_flags &= ~URB_ALIGNED_TEMP_BUFFER;
 }
 
@@ -606,9 +605,9 @@ static int alloc_temp_buffer(struct urb *urb, gfp_t mem_flags)
 	size_t kmalloc_size;
 
 	if (urb->num_sgs || urb->sg ||
-		urb->transfer_buffer_length == 0 ||
-		!((uintptr_t)urb->transfer_buffer & (TEGRA_USB_DMA_ALIGN - 1)))
-	return 0;
+	    urb->transfer_buffer_length == 0 ||
+	    !((uintptr_t)urb->transfer_buffer & (TEGRA_USB_DMA_ALIGN - 1)))
+		return 0;
 
 	dir = usb_urb_dir_in(urb) ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 
@@ -627,17 +626,16 @@ static int alloc_temp_buffer(struct urb *urb, gfp_t mem_flags)
 	temp->old_xfer_buffer = urb->transfer_buffer;
 	if (dir == DMA_TO_DEVICE)
 		memcpy(temp->data, urb->transfer_buffer,
-	urb->transfer_buffer_length);
+		       urb->transfer_buffer_length);
 	urb->transfer_buffer = temp->data;
 
-	BUILD_BUG_ON(!(URB_ALIGNED_TEMP_BUFFER & URB_DRIVER_PRIVATE));
 	urb->transfer_flags |= URB_ALIGNED_TEMP_BUFFER;
 
 	return 0;
 }
 
 static int tegra_ehci_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
-					gfp_t mem_flags)
+				      gfp_t mem_flags)
 {
 	int ret;
 
@@ -648,6 +646,7 @@ static int tegra_ehci_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 	ret = usb_hcd_map_urb_for_dma(hcd, urb, mem_flags);
 	if (ret)
 		free_temp_buffer(urb);
+
 	return ret;
 }
 
