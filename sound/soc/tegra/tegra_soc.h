@@ -75,6 +75,8 @@
 	SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000)
 #define TEGRA_VOICE_SAMPLE_RATES SNDRV_PCM_RATE_8000
 
+#define DMA_STEP_SIZE_MIN 8
+
 struct tegra_dma_channel;
 
 struct tegra_runtime_data {

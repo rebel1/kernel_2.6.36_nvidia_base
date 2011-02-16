@@ -125,7 +125,7 @@ static const struct snd_pcm_hardware tegra_pcm_hardware = {
 	.channels_min		= 1,
 	.channels_max		= 2,
 	.buffer_bytes_max	= (PAGE_SIZE * 8),
-	.period_bytes_min	= 256,
+	.period_bytes_min	= 128,
 	.period_bytes_max	= (PAGE_SIZE),
 	.periods_min		= 2,
 	.periods_max		= 8,
@@ -218,8 +218,26 @@ static snd_pcm_uframes_t tegra_pcm_pointer(struct snd_pcm_substream *substream)
 static int tegra_pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct tegra_runtime_data *prtd;
+	struct tegra_runtime_data *prtd = 0;
 	int ret=0;
+
+	/* Ensure period size is multiple of minimum DMA step size */
+	ret = snd_pcm_hw_constraint_step(runtime, 0,
+		SNDRV_PCM_HW_PARAM_PERIOD_BYTES, DMA_STEP_SIZE_MIN);
+	if (ret < 0) {
+		pr_err("%s:snd_pcm_hw_constraint_step failed: %d\n",
+			__func__, ret);
+		goto fail;
+	}
+
+	/* Ensure buffer size is multiple of period size */
+	ret = snd_pcm_hw_constraint_integer(runtime,
+					    SNDRV_PCM_HW_PARAM_PERIODS);
+	if (ret < 0) {
+		pr_err("%s:snd_pcm_hw_constraint_integer failed: %d\n",
+			__func__, ret);
+		goto fail;
+	}
 
 	prtd = kzalloc(sizeof(struct tegra_runtime_data), GFP_KERNEL);
 	if (prtd == NULL)
@@ -258,17 +276,19 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 	goto end;
 
 fail:
-	prtd->state = STATE_EXIT;
+	if (prtd) {
+		prtd->state = STATE_EXIT;
 
-	if (prtd->dma_chan) {
-		tegra_dma_flush(prtd->dma_chan);
-		tegra_dma_free_channel(prtd->dma_chan);
+		if (prtd->dma_chan) {
+			tegra_dma_flush(prtd->dma_chan);
+			tegra_dma_free_channel(prtd->dma_chan);
+		}
+
+		/* set pins state to tristate */
+		tegra_das_power_mode(false);
+
+		kfree(prtd);
 	}
-
-	/* set pins state to tristate */
-	tegra_das_power_mode(false);
-
-	kfree(prtd);
 
 end:
 	return ret;
