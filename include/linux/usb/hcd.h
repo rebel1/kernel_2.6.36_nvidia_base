@@ -340,9 +340,6 @@ extern void usb_hcd_unlink_urb_from_ep(struct usb_hcd *hcd, struct urb *urb);
 
 extern int usb_hcd_submit_urb(struct urb *urb, gfp_t mem_flags);
 extern int usb_hcd_unlink_urb(struct urb *urb, int status);
-extern int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
-		gfp_t mem_flags);
-extern void usb_hcd_unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb);
 extern void usb_hcd_giveback_urb(struct usb_hcd *hcd, struct urb *urb,
 		int status);
 extern int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
