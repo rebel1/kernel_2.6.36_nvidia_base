@@ -1165,7 +1165,7 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 	else
 		val |= SOR_STATE_ASY_VSYNCPOL_POS;
 
-	tegra_hdmi_writel(hdmi, val, HDMI_NV_PDISP_SOR_STATE2);
+	_tegra_hdmi_writel(hdmi, val, HDMI_NV_PDISP_SOR_STATE2);
 
 	val = SOR_STATE_ASY_HEAD_OPMODE_AWAKE | SOR_STATE_ASY_ORMODE_NORMAL;
 	_tegra_hdmi_writel(hdmi, val, HDMI_NV_PDISP_SOR_STATE1);
