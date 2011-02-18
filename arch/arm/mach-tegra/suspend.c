@@ -615,7 +615,8 @@ static int tegra_suspend_enter(suspend_state_t state)
 
 	for_each_irq_desc(irq, desc) {
 		if ((desc->status & IRQ_WAKEUP) &&
-		    (desc->status & IRQ_SUSPENDED)) {
+		    (desc->status & IRQ_SUSPENDED) &&
+		    (get_irq_chip(irq)->unmask)) {
 			get_irq_chip(irq)->unmask(irq);
 		}
 	}
@@ -631,7 +632,8 @@ static int tegra_suspend_enter(suspend_state_t state)
 
 	for_each_irq_desc(irq, desc) {
 		if ((desc->status & IRQ_WAKEUP) &&
-		    (desc->status & IRQ_SUSPENDED)) {
+		    (desc->status & IRQ_SUSPENDED) &&
+		    (get_irq_chip(irq)->mask)) {
 			get_irq_chip(irq)->mask(irq);
 		}
 	}
