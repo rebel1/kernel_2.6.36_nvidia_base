@@ -61,6 +61,12 @@ static struct switch_dev wired_switch_dev = {
 	.name = "h2w",
 };
 
+void tegra_switch_set_state(int state)
+{
+
+	switch_set_state(&wired_switch_dev, state);
+}
+
 static int wired_swith_notify(struct notifier_block *self,
 			      unsigned long action, void* dev)
 {
@@ -77,7 +83,7 @@ static int wired_swith_notify(struct notifier_block *self,
 		state = 0;
 	}
 
-	switch_set_state(&wired_switch_dev, state);
+	tegra_switch_set_state(state);
 
 	return NOTIFY_OK;
 }

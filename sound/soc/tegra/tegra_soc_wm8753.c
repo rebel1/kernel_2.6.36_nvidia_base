@@ -28,6 +28,15 @@
 #include "../codecs/wm8753.h"
 #include <linux/regulator/consumer.h>
 
+#include <linux/types.h>
+#include <sound/jack.h>
+#include <linux/switch.h>
+#include <mach/gpio.h>
+#include <mach/audio.h>
+#include <linux/interrupt.h>
+#include <linux/delay.h>
+#include <linux/workqueue.h>
+
 #define WM8753_PWR1_VMIDSEL_1		1<<8
 #define WM8753_PWR1_VMIDSEL_0		1<<7
 #define WM8753_PWR1_VREF		1<<6
@@ -98,6 +107,36 @@
 #define WM8753_LINVOL_MAX		0x11F
 
 #define WM8753_RINVOL_MAX		0x11F
+
+#define WM8753_GPIO2_GP2M_2		1<<5
+#define WM8753_GPIO2_GP2M_1 	1<<4
+#define WM8753_GPIO2_GP2M_0 	1<<3
+
+#define WM8753_GPIO1_INTCON_1 	1<<8
+#define WM8753_GPIO1_INTCON_0 	1<<7
+
+#define WM8753_INTPOL_GPIO4IPOL 1<<4
+
+#define WM8753_INTEN_MICSHTEN	1<<0
+#define WM8753_INTEN_MICDETEN	1<<1
+#define WM8753_INTEN_GPIO3IEN	1<<3
+#define WM8753_INTEN_GPIO4IEN	1<<4
+#define WM8753_INTEN_GPIO5IEN	1<<5
+#define WM8753_INTEN_HPSWIEN	1<<6
+#define WM8753_INTEN_TSDIEN 	1<<7
+
+/* Board Specific GPIO configuration for Whistler */
+#define TEGRA_GPIO_PW3 			179
+
+static struct wm8753_headphone_jack
+{
+	struct snd_jack *jack;
+	int gpio;
+	struct work_struct work;
+	struct snd_soc_codec* pcodec;
+};
+
+static struct wm8753_headphone_jack* wm8753_jack = NULL;
 
 static struct platform_device *tegra_snd_device;
 static struct regulator* wm8753_reg;
@@ -325,10 +364,132 @@ static struct snd_soc_ops tegra_voice_ops = {
 	.hw_free   = tegra_voice_hw_free,
 };
 
+static void wm8753_intr_work(struct work_struct *work)
+{
+	unsigned int value;
+
+	/* Do something here */
+	mutex_lock(&wm8753_jack->pcodec->mutex);
+
+	/* GPIO4 interrupt disable (also disable other interrupts) */
+	value = snd_soc_read(wm8753_jack->pcodec, WM8753_INTEN);
+	value &= ~(WM8753_INTEN_MICSHTEN | WM8753_INTEN_MICDETEN |
+			  WM8753_INTEN_GPIO3IEN | WM8753_INTEN_HPSWIEN |
+			  WM8753_INTEN_GPIO5IEN | WM8753_INTEN_TSDIEN |
+			  WM8753_INTEN_GPIO4IEN);
+	snd_soc_write(wm8753_jack->pcodec, WM8753_INTEN, value);
+
+	/* Invert GPIO4 interrupt polarity */
+	value = snd_soc_read(wm8753_jack->pcodec, WM8753_INTPOL);
+	value &= WM8753_INTPOL_GPIO4IPOL;
+	if ((value) & ((WM8753_INTPOL_GPIO4IPOL))) {
+		tegra_switch_set_state(SND_JACK_HEADPHONE);
+		snd_jack_report(wm8753_jack->jack, SND_JACK_HEADPHONE);
+		value &= ~(WM8753_INTPOL_GPIO4IPOL);
+	}
+	else {
+		tegra_switch_set_state(0);
+		snd_jack_report(wm8753_jack->jack, 0);
+		value |= (WM8753_INTPOL_GPIO4IPOL);
+	}
+	snd_soc_write(wm8753_jack->pcodec, WM8753_INTPOL, value);
+
+	/* GPIO4 interrupt enable */
+	value = snd_soc_read(wm8753_jack->pcodec, WM8753_INTEN);
+	value |= (WM8753_INTEN_GPIO4IEN);
+	value &= ~(WM8753_INTEN_MICSHTEN | WM8753_INTEN_MICDETEN |
+			  WM8753_INTEN_GPIO3IEN | WM8753_INTEN_HPSWIEN |
+			  WM8753_INTEN_GPIO5IEN | WM8753_INTEN_TSDIEN);
+	snd_soc_write(wm8753_jack->pcodec, WM8753_INTEN, value);
+
+	mutex_unlock(&wm8753_jack->pcodec->mutex);
+}
+
+static irqreturn_t wm8753_irq(int irq, void *data)
+{
+	schedule_work(&wm8753_jack->work);
+	return IRQ_HANDLED;
+}
 
 static int tegra_codec_init(struct snd_soc_codec *codec)
 {
-	return tegra_controls_init(codec);
+	int ret;
+	unsigned int value;
+
+	ret =  tegra_controls_init(codec);
+	if (ret < 0)
+		goto failed;
+
+	if (!wm8753_jack) {
+
+		wm8753_jack = kzalloc(sizeof(*wm8753_jack), GFP_KERNEL);
+		if (!wm8753_jack) {
+			pr_err("failed to allocate wm8753-jack\n");
+			return -ENOMEM;
+		}
+
+		wm8753_jack->gpio = TEGRA_GPIO_PW3;
+		wm8753_jack->pcodec = codec;
+
+		INIT_WORK(&wm8753_jack->work, wm8753_intr_work);
+
+		ret = snd_jack_new(codec->card, "Headphone Jack", SND_JACK_HEADPHONE,
+			&wm8753_jack->jack);
+		if (ret < 0)
+			goto failed;
+
+		ret = gpio_request(wm8753_jack->gpio, "headphone-detect-gpio");
+		if (ret)
+			goto failed;
+
+		ret = gpio_direction_input(wm8753_jack->gpio);
+		if (ret)
+			goto gpio_failed;
+
+		tegra_gpio_enable(wm8753_jack->gpio);
+
+		ret = request_irq(gpio_to_irq(wm8753_jack->gpio),
+				wm8753_irq,
+				IRQF_TRIGGER_FALLING,
+				"wm8753",
+				wm8753_jack);
+
+		if (ret)
+			goto gpio_failed;
+
+		/* Configure GPIO2 pin to generate the interrupt */
+		value = snd_soc_read(codec, WM8753_GPIO2);
+		value |= (WM8753_GPIO2_GP2M_0 | WM8753_GPIO2_GP2M_1);
+		value &= ~(WM8753_GPIO2_GP2M_2);
+		snd_soc_write(codec, WM8753_GPIO2, value);
+
+		/* Active low Interrupt */
+		value = snd_soc_read(codec, WM8753_GPIO1);
+		value |= (WM8753_GPIO1_INTCON_1 | WM8753_GPIO1_INTCON_0);
+		snd_soc_write(codec, WM8753_GPIO1, value);
+
+		/* GPIO4 interrupt polarity -- interupt when low i.e Headphone connected */
+		value = snd_soc_read(codec, WM8753_INTPOL);
+		value |= (WM8753_INTPOL_GPIO4IPOL);
+		snd_soc_write(codec, WM8753_INTPOL, value);
+
+		/* GPIO4 interrupt enable and disable other interrupts */
+		value = snd_soc_read(codec, WM8753_INTEN);
+		value |= (WM8753_INTEN_GPIO4IEN);
+		value &= ~(WM8753_INTEN_MICSHTEN | WM8753_INTEN_MICDETEN |
+			      WM8753_INTEN_GPIO3IEN | WM8753_INTEN_HPSWIEN |
+			      WM8753_INTEN_GPIO5IEN | WM8753_INTEN_TSDIEN);
+		snd_soc_write(codec, WM8753_INTEN, value);
+	}
+
+	return ret;
+
+gpio_failed:
+	gpio_free(wm8753_jack->gpio);
+failed:
+	kfree(wm8753_jack);
+	wm8753_jack = NULL;
+	return ret;
 }
 
 static struct snd_soc_dai_link tegra_soc_dai[] = {
@@ -414,6 +575,12 @@ static void __exit tegra_exit(void)
 	platform_device_unregister(tegra_snd_device);
 	regulator_disable(wm8753_reg);
 	regulator_put(wm8753_reg);
+
+	if (wm8753_jack) {
+		gpio_free(wm8753_jack->gpio);
+		kfree(wm8753_jack);
+		wm8753_jack = NULL;
+	}
 }
 
 module_init(tegra_init);
