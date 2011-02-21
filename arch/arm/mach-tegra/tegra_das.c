@@ -502,6 +502,41 @@ static int __init tegra_das_init(void)
 {
 	return platform_driver_register(&tegra_das_driver);
 }
-
 module_init(tegra_das_init);
+
+void tegra_das_get_all_regs(struct das_regs_cache* regs)
+{
+	unsigned long reg_base = das_drv_data->das_base;
+
+	regs->das_dap_ctrl_0 = das_readl(reg_base, APB_MISC_DAS_DAP_CTRL_SEL_0);
+	regs->das_dap_ctrl_1 = das_readl(reg_base, APB_MISC_DAS_DAP_CTRL_SEL_1);
+	regs->das_dap_ctrl_2 = das_readl(reg_base, APB_MISC_DAS_DAP_CTRL_SEL_2);
+	regs->das_dap_ctrl_3 = das_readl(reg_base, APB_MISC_DAS_DAP_CTRL_SEL_3);
+	regs->das_dap_ctrl_4 = das_readl(reg_base, APB_MISC_DAS_DAP_CTRL_SEL_4);
+	regs->das_dac_input_data_clk_0 = das_readl(reg_base,
+					APB_MISC_DAS_DAC_INPUT_DATA_CLK_SEL_0);
+	regs->das_dac_input_data_clk_1 = das_readl(reg_base,
+					APB_MISC_DAS_DAC_INPUT_DATA_CLK_SEL_1);
+	regs->das_dac_input_data_clk_2 = das_readl(reg_base,
+					APB_MISC_DAS_DAC_INPUT_DATA_CLK_SEL_2);
+}
+EXPORT_SYMBOL_GPL(tegra_das_get_all_regs);
+
+void tegra_das_set_all_regs(struct das_regs_cache* regs)
+{
+	unsigned long reg_base = das_drv_data->das_base;
+
+	das_writel(reg_base, regs->das_dap_ctrl_0, APB_MISC_DAS_DAP_CTRL_SEL_0);
+	das_writel(reg_base, regs->das_dap_ctrl_1, APB_MISC_DAS_DAP_CTRL_SEL_1);
+	das_writel(reg_base, regs->das_dap_ctrl_2, APB_MISC_DAS_DAP_CTRL_SEL_2);
+	das_writel(reg_base, regs->das_dap_ctrl_3, APB_MISC_DAS_DAP_CTRL_SEL_3);
+	das_writel(reg_base, regs->das_dap_ctrl_4, APB_MISC_DAS_DAP_CTRL_SEL_4);
+	das_writel(reg_base, regs->das_dac_input_data_clk_0,
+					APB_MISC_DAS_DAC_INPUT_DATA_CLK_SEL_0);
+	das_writel(reg_base, regs->das_dac_input_data_clk_1,
+					APB_MISC_DAS_DAC_INPUT_DATA_CLK_SEL_1);
+	das_writel(reg_base, regs->das_dac_input_data_clk_2,
+					APB_MISC_DAS_DAC_INPUT_DATA_CLK_SEL_2);
+}
+EXPORT_SYMBOL_GPL(tegra_das_set_all_regs);
 MODULE_LICENSE("GPL");

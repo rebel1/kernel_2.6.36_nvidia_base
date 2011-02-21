@@ -265,6 +265,10 @@ struct i2s_runtime_data {
 	int i2s_status_0;
 	int i2s_timing_0;
 	int i2s__fifo_scr_0;
+	int i2s_pcm_ctrl_0;
+	int i2s_nw_ctrl_0;
+	int i2s_tdm_ctrl_0;
+	int i2s_tdm_tx_rx_ctrl_0;
 	int i2s_fifo1_0;
 	int i2s_fifo2_0;
 };

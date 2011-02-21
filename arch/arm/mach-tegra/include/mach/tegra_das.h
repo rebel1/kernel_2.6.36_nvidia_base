@@ -204,6 +204,17 @@ struct tegra_das_mux_select {
 	u32 mux_value;
 };
 
+struct das_regs_cache {
+	u32 das_dap_ctrl_0;
+	u32 das_dap_ctrl_1;
+	u32 das_dap_ctrl_2;
+	u32 das_dap_ctrl_3;
+	u32 das_dap_ctrl_4;
+	u32 das_dac_input_data_clk_0;
+	u32 das_dac_input_data_clk_1;
+	u32 das_dac_input_data_clk_2;
+};
+
 
 int tegra_das_open(void);
 
@@ -227,5 +238,14 @@ int tegra_das_get_connection(void);
  */
 int tegra_das_power_mode(bool is_normal);
 
+/*
+ * Function to get the content of all the das registers
+ */
+void tegra_das_get_all_regs(struct das_regs_cache* regs);
+
+/*
+ * Function to set values in all the das registers
+ */
+void tegra_das_set_all_regs(struct das_regs_cache* regs);
 
 #endif
