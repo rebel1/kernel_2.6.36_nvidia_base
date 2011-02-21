@@ -247,9 +247,6 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 	runtime->private_data = prtd;
 	prtd->substream = substream;
 
-	/* set pins state to normal */
-	tegra_das_power_mode(true);
-
 	prtd->state = STATE_INVALID;
 
 	setup_dma_request(substream,
@@ -283,10 +280,6 @@ fail:
 			tegra_dma_flush(prtd->dma_chan);
 			tegra_dma_free_channel(prtd->dma_chan);
 		}
-
-		/* set pins state to tristate */
-		tegra_das_power_mode(false);
-
 		kfree(prtd);
 	}
 
@@ -314,10 +307,6 @@ static int tegra_pcm_close(struct snd_pcm_substream *substream)
 		tegra_dma_free_channel(prtd->dma_chan);
 		prtd->dma_chan = NULL;
 	}
-
-	/* set pins state to tristate */
-	tegra_das_power_mode(false);
-
 	kfree(prtd);
 
 	return 0;

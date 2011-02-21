@@ -35,6 +35,7 @@ struct tegra_i2s_info {
 	/* Control for whole I2S (Data format, etc.) */
 	unsigned int bit_format;
 	struct i2s_runtime_data i2s_regs;
+	struct das_regs_cache das_regs;
 };
 
 void setup_dma_request(struct snd_pcm_substream *substream,
@@ -354,6 +355,7 @@ int tegra_i2s_suspend(struct snd_soc_dai *cpu_dai)
 	struct tegra_i2s_info *info = cpu_dai->private_data;
 
 	i2s_get_all_regs(cpu_dai->id, &info->i2s_regs);
+	tegra_das_get_all_regs(&info->das_regs);
 
 	return 0;
 }
@@ -362,6 +364,7 @@ int tegra_i2s_resume(struct snd_soc_dai *cpu_dai)
 {
 	struct tegra_i2s_info *info = cpu_dai->private_data;
 
+	tegra_das_set_all_regs(&info->das_regs);
 	i2s_set_all_regs(cpu_dai->id, &info->i2s_regs);
 
 	return 0;
@@ -380,6 +383,9 @@ static int tegra_i2s_startup(struct snd_pcm_substream *substream,
 	clk_enable(info->dap_mclk);
 	clk_enable(info->audio_sync_clk);
 
+	/* set das pins state to normal */
+	tegra_das_power_mode(true);
+
 	return 0;
 }
 
@@ -387,6 +393,9 @@ static void tegra_i2s_shutdown(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct tegra_i2s_info *info = dai->private_data;
+
+	/* set das pins state to tristate */
+	tegra_das_power_mode(false);
 
 	clk_disable(info->dap_mclk);
 	clk_disable(info->audio_sync_clk);
