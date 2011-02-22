@@ -76,6 +76,7 @@
 #define TEGRA_VOICE_SAMPLE_RATES SNDRV_PCM_RATE_8000
 
 #define DMA_STEP_SIZE_MIN 8
+#define DMA_REQ_QCOUNT 2
 
 struct tegra_dma_channel;
 
@@ -83,7 +84,9 @@ struct tegra_runtime_data {
 	struct snd_pcm_substream *substream;
 	int size;
 	int dma_pos;
-	struct tegra_dma_req dma_req1, dma_req2;
+	struct tegra_dma_req dma_req[DMA_REQ_QCOUNT];
+	int dma_reqid_head;
+	int dma_reqid_tail;
 	volatile int state;
 	int period_index;
 	int i2s_shutdown;
