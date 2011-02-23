@@ -642,15 +642,17 @@ static const struct driver_info mbm_info = {
 
 static const struct usb_device_id products[] = {
 	{
+	 /* Ericsson f5521gw */
+	 .match_flags = USB_DEVICE_ID_MATCH_INT_INFO
+		| USB_DEVICE_ID_MATCH_DEVICE,
+	 USB_DEVICE(0x0bdb,0x190d),
+	 .driver_info = (unsigned long)&mbm_info,
+	 },
+	{
 	 /* standard NCM class device */
 	 USB_INTERFACE_INFO(USB_CLASS_COMM, USB_CDC_SUBCLASS_NCM,
 			    USB_CDC_PROTO_NONE),
 	 .driver_info = (unsigned long)&ncm_info,
-	 },
-	{
-	 /* Ericsson f5521gw */
-	 USB_DEVICE(0x0bdb,0x190d),
-	 .driver_info = (unsigned long)&mbm_info,
 	 },
 	{},
 };
