@@ -1975,7 +1975,7 @@ static __devinit int wm8903_i2c_probe(struct i2c_client *i2c,
 	/* Set up GPIOs and microphone detection */
 	if (pdata) {
 		for (i = 0; i < ARRAY_SIZE(pdata->gpio_cfg); i++) {
-			if (!pdata->gpio_cfg[i])
+			if (pdata->gpio_cfg[i] == WM8903_GPIO_NO_CONFIG)
 				continue;
 
 			snd_soc_write(codec, WM8903_GPIO_CONTROL_1 + i,
