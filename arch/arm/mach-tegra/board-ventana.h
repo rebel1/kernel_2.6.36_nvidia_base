@@ -49,6 +49,14 @@ int ventana_emc_init(void);
 #define CAM3_LDO_SHUTDN_L_GPIO	(TCA6416_GPIO_BASE + 11) /* gpio11 */
 #define CAM_I2C_MUX_RST_GPIO	(TCA6416_GPIO_BASE + 15) /* gpio15 */
 
+/* WM8903 gpios */
+#define WM8903_GPIO_BASE	(TEGRA_NR_GPIOS + 32)
+#define WM8903_GP1		(WM8903_GPIO_BASE + 0)
+#define WM8903_GP2		(WM8903_GPIO_BASE + 1)
+#define WM8903_GP3		(WM8903_GPIO_BASE + 2)
+#define WM8903_GP4		(WM8903_GPIO_BASE + 3)
+#define WM8903_GP5		(WM8903_GPIO_BASE + 4)
+
 /* Interrupt numbers from external peripherals */
 #define TPS6586X_INT_BASE	TEGRA_NR_IRQS
 #define TPS6586X_INT_END	(TPS6586X_INT_BASE + 32)
