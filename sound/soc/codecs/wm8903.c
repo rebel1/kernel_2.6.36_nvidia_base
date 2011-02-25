@@ -23,6 +23,7 @@
 #include <linux/i2c.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/gpio.h>
 #include <sound/core.h>
 #include <sound/jack.h>
 #include <sound/pcm.h>
@@ -374,7 +375,131 @@ struct wm8903_priv {
 
 	struct snd_pcm_substream *master_substream;
 	struct snd_pcm_substream *slave_substream;
+
+#ifdef CONFIG_GPIOLIB
+	struct gpio_chip gpio_chip;
+#endif
 };
+
+#ifdef CONFIG_GPIOLIB
+static inline struct wm8903_priv *gpio_to_wm8903(struct gpio_chip* chip)
+{
+	return container_of(chip, struct wm8903_priv, gpio_chip);
+}
+
+static int wm8903_gpio_request(struct gpio_chip* chip,
+			       unsigned int offset)
+{
+	if (offset >= WM8903_NUM_GPIO)
+		return -EINVAL;
+
+	return 0;
+}
+
+static int wm8903_gpio_direction_in(struct gpio_chip* chip,
+				    unsigned int offset)
+{
+	struct wm8903_priv* wm8903 = gpio_to_wm8903(chip);
+	struct snd_soc_codec* codec = &(wm8903->codec);
+	unsigned int mask, val;
+
+	mask = WM8903_GP1_FN_MASK | WM8903_GP1_DIR_MASK;
+	val = (WM8903_GPn_FN_GPIO_INPUT << WM8903_GP1_FN_SHIFT) |
+		WM8903_GP1_DIR;
+
+	return snd_soc_update_bits(codec, WM8903_GPIO_CONTROL_1 + offset,
+				  mask, val);
+}
+
+static int wm8903_gpio_direction_out(struct gpio_chip* chip,
+				     unsigned int offset, int value)
+{
+	struct wm8903_priv* wm8903 = gpio_to_wm8903(chip);
+	struct snd_soc_codec* codec = &(wm8903->codec);
+	unsigned int mask, val;
+
+	mask = WM8903_GP1_FN_MASK | WM8903_GP1_DIR_MASK | WM8903_GP1_LVL_MASK;
+	val = (WM8903_GPn_FN_GPIO_OUTPUT << WM8903_GP1_FN_SHIFT) |
+		(!!value << WM8903_GP1_LVL_SHIFT);
+
+	return snd_soc_update_bits(codec, WM8903_GPIO_CONTROL_1 + offset,
+				  mask, val);
+}
+
+static int wm8903_gpio_get(struct gpio_chip* chip, unsigned int offset)
+{
+	struct wm8903_priv* wm8903 = gpio_to_wm8903(chip);
+	struct snd_soc_codec* codec = &(wm8903->codec);
+	int reg;
+
+	reg = snd_soc_read(codec, WM8903_GPIO_CONTROL_1 + offset);
+
+	return (reg & WM8903_GP1_LVL_MASK) >> WM8903_GP1_LVL_SHIFT;
+}
+
+static void wm8903_gpio_set(struct gpio_chip* chip, unsigned int offset,
+			    int value)
+{
+	struct wm8903_priv* wm8903 = gpio_to_wm8903(chip);
+	struct snd_soc_codec* codec = &(wm8903->codec);
+
+	snd_soc_update_bits(codec, WM8903_GPIO_CONTROL_1 + offset,
+			    WM8903_GP1_LVL_MASK,
+			    !!value << WM8903_GP1_LVL_SHIFT);
+}
+
+static struct gpio_chip wm8903_gpio_chip = {
+	.label		  = "wm8903",
+	.owner		  = THIS_MODULE,
+	.request	  = wm8903_gpio_request,
+	.direction_input  = wm8903_gpio_direction_in,
+	.direction_output = wm8903_gpio_direction_out,
+	.get		  = wm8903_gpio_get,
+	.set		  = wm8903_gpio_set,
+	.can_sleep	  = 1,
+};
+
+static void wm8903_init_gpio(struct snd_soc_codec* codec)
+{
+	struct wm8903_priv* wm8903 = snd_soc_codec_get_drvdata(codec);
+	struct wm8903_platform_data* pdata = dev_get_platdata(codec->dev);
+	int ret;
+
+	wm8903->gpio_chip = wm8903_gpio_chip;
+	wm8903->gpio_chip.ngpio = WM8903_NUM_GPIO;
+	wm8903->gpio_chip.dev = codec->dev;
+
+	if (pdata && pdata->gpio_base)
+		wm8903->gpio_chip.base = pdata->gpio_base;
+	else
+		wm8903->gpio_chip.base = -1;
+
+	ret = gpiochip_add(&wm8903->gpio_chip);
+	if (ret != 0)
+		dev_err(codec->dev,
+			"Failed to add GPIOs for wm8903: %d\n", ret);
+}
+
+static void wm8903_free_gpio(struct snd_soc_codec* codec)
+{
+	struct wm8903_priv* wm8903 = snd_soc_codec_get_drvdata(codec);
+	int ret;
+
+	ret = gpiochip_remove(&wm8903->gpio_chip);
+	if (ret != 0)
+		dev_err(codec->dev,
+			"Failed to remove GPIOs for wm8903: %d\n", ret);
+}
+#else
+static void wm8903_init_gpio(struct snd_soc_codec* codec)
+{
+}
+
+static void wm8903_free_gpio(struct snd_soc_codec* codec)
+{
+}
+#endif
+
 
 static int wm8903_volatile_register(unsigned int reg)
 {
@@ -2019,6 +2144,8 @@ static int wm8903_probe(struct platform_device *pdev)
 				ARRAY_SIZE(wm8903_snd_controls));
 	wm8903_add_widgets(socdev->card->codec);
 
+	wm8903_init_gpio(socdev->card->codec);
+
 	return ret;
 
 err:
@@ -2036,6 +2163,8 @@ static int wm8903_remove(struct platform_device *pdev)
 
 	snd_soc_free_pcms(socdev);
 	snd_soc_dapm_free(socdev);
+
+	wm8903_free_gpio(codec);
 
 	return 0;
 }
