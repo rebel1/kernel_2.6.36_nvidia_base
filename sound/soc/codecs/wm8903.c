@@ -988,6 +988,11 @@ static int wm8903_set_bias_level(struct snd_soc_codec *codec,
 
 	case SND_SOC_BIAS_OFF:
 		wm8903_run_sequence(codec, 32);
+
+		snd_soc_write(codec, WM8903_VMID_CONTROL_0, 0x0);
+
+		snd_soc_write(codec, WM8903_BIAS_CONTROL_0, 0x0);
+
 		reg = snd_soc_read(codec, WM8903_CLOCK_RATES_2);
 		reg &= ~WM8903_CLK_SYS_ENA;
 		snd_soc_write(codec, WM8903_CLOCK_RATES_2, reg);
