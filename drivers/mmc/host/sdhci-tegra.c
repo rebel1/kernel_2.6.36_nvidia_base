@@ -40,6 +40,7 @@ struct tegra_sdhci_host {
 	int clk_enabled;
 	bool card_always_on;
 	u32 sdhci_ints;
+	int wp_gpio;
 };
 
 static irqreturn_t carddetect_irq(int irq, void *data)
@@ -85,9 +86,19 @@ static void tegra_sdhci_set_clock(struct sdhci_host *sdhci, unsigned int clock)
 	tegra_sdhci_enable_clock(host, clock);
 }
 
+static int tegra_sdhci_get_ro(struct sdhci_host *sdhci)
+{
+	struct tegra_sdhci_host *host;
+	host = sdhci_priv(sdhci);
+	if (gpio_is_valid(host->wp_gpio))
+		return gpio_get_value(host->wp_gpio);
+	return 0;
+}
+
 static struct sdhci_ops tegra_sdhci_ops = {
 	.enable_dma = tegra_sdhci_enable_dma,
 	.set_clock = tegra_sdhci_set_clock,
+	.get_ro = tegra_sdhci_get_ro,
 };
 
 static int __devinit tegra_sdhci_probe(struct platform_device *pdev)
@@ -125,6 +136,7 @@ static int __devinit tegra_sdhci_probe(struct platform_device *pdev)
 	host = sdhci_priv(sdhci);
 	host->sdhci = sdhci;
 	host->card_always_on = (plat->power_gpio == -1) ? 1 : 0;
+	host->wp_gpio = plat->wp_gpio;
 
 	host->clk = clk_get(&pdev->dev, plat->clk_id);
 	if (IS_ERR(host->clk)) {
