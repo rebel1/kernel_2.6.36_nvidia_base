@@ -551,6 +551,7 @@ static void tegra_dc_hdmi_suspend(struct tegra_dc *dc)
 
 	tegra_nvhdcp_suspend(hdmi->nvhdcp);
 	spin_lock_irqsave(&hdmi->suspend_lock, flags);
+	tegra_nvhdcp_suspend(hdmi->nvhdcp);
 	hdmi->suspended = true;
 	spin_unlock_irqrestore(&hdmi->suspend_lock, flags);
 }
@@ -1203,8 +1204,8 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 	tegra_dc_writel(dc, GENERAL_ACT_REQ << 8, DC_CMD_STATE_CONTROL);
 	tegra_dc_writel(dc, GENERAL_ACT_REQ, DC_CMD_STATE_CONTROL);
 
-	tegra_nvhdcp_set_plug(hdmi->nvhdcp, 1);
-
+	if (!hdmi->dvi)
+		tegra_nvhdcp_set_plug(hdmi->nvhdcp, 1);
 }
 
 static void tegra_dc_hdmi_disable(struct tegra_dc *dc)

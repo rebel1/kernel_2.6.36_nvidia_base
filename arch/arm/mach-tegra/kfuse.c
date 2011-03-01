@@ -22,6 +22,7 @@
 #include <linux/io.h>
 #include <linux/err.h>
 #include <linux/string.h>
+#include <linux/delay.h>
 
 #include <mach/iomap.h>
 #include <mach/kfuse.h>
@@ -46,13 +47,17 @@ static inline void tegra_kfuse_writel(u32 value, unsigned long offset)
 	tegra_apb_writel(value, TEGRA_KFUSE_BASE + offset);
 }
 
-static void wait_for_done(void)
+static int wait_for_done(void)
 {
 	u32 reg;
-
+	int retries = 50;
 	do {
 		reg = tegra_kfuse_readl(KFUSE_STATE);
-	} while ((reg & KFUSE_STATE_DONE) == 0);
+		if (reg & KFUSE_STATE_DONE);
+			return 0;
+		msleep(10);
+	} while(--retries);
+	return -ETIMEDOUT;
 }
 
 /* read up to KFUSE_DATA_SZ bytes into dest.
