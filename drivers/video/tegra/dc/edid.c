@@ -117,7 +117,7 @@ static void tegra_edid_dump(struct tegra_edid *edid)
 }
 #endif
 
-static int tegra_edid_read_block(struct tegra_edid *edid, int block, u8 *data)
+int tegra_edid_read_block(struct tegra_edid *edid, int block, u8 *data)
 {
 	u8 block_buf[] = {block >> 1};
 	u8 cmd_buf[] = {(block & 0x1) * 128};
