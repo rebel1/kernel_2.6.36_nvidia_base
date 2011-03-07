@@ -45,6 +45,8 @@
 #include <linux/i2c/atmel_maxtouch.h>
 #endif
 
+#include <sound/wm8903.h>
+
 #include <mach/clk.h>
 #include <mach/iomap.h>
 #include <mach/irqs.h>
@@ -330,9 +332,21 @@ static struct platform_device rndis_device = {
 };
 #endif
 
+static struct wm8903_platform_data wm8903_pdata = {
+	.gpio_base = WM8903_GPIO_BASE,
+	.gpio_cfg = {
+		WM8903_GPIO_NO_CONFIG,
+		WM8903_GPIO_NO_CONFIG,
+		0,                     /* as output pin */
+		WM8903_GPIO_NO_CONFIG,
+		WM8903_GPIO_NO_CONFIG,
+	},
+};
+
 static struct i2c_board_info __initdata ventana_i2c_bus1_board_info[] = {
 	{
 		I2C_BOARD_INFO("wm8903", 0x1a),
+		.platform_data = &wm8903_pdata,
 		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PX3),
 	},
 };
