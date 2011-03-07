@@ -1163,6 +1163,9 @@ static bool _tegra_dc_controller_enable(struct tegra_dc *dc)
 
 	clk_enable(dc->clk);
 	clk_enable(dc->emc_clk);
+	tegra_periph_reset_deassert(dc->clk);
+	msleep(10);
+
 	enable_irq(dc->irq);
 
 	tegra_dc_init(dc);

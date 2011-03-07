@@ -26,7 +26,7 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb/hcd.h>
 #include <linux/platform_device.h>
-#include <linux/tegra_usb.h>
+#include <linux/platform_data/tegra_usb.h>
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/delay.h>
@@ -339,7 +339,7 @@ static int __exit tegra_otg_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
-static int tegra_otg_suspend(struct platform_device *pdev)
+static int tegra_otg_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct tegra_otg_data *tegra_otg = platform_get_drvdata(pdev);
 
