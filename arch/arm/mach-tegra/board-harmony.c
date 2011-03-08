@@ -27,7 +27,7 @@
 #include <linux/i2c-tegra.h>
 #include <linux/io.h>
 #include <linux/delay.h>
-#include <linux/tegra_usb.h>
+#include <linux/platform_data/tegra_usb.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
