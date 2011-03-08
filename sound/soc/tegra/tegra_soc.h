@@ -108,6 +108,7 @@ struct wired_jack_conf {
 	int hp_det_n;
 	int en_mic_int;
 	int en_mic_ext;
+	int cdc_irq;
 	int en_spkr;
 };
 

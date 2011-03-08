@@ -164,10 +164,39 @@ static int tegra_dapm_event_int_spk(struct snd_soc_dapm_widget* w,
 	return 0;
 }
 
+static int tegra_dapm_event_int_mic(struct snd_soc_dapm_widget* w,
+				    struct snd_kcontrol* k, int event)
+{
+	if (tegra_wired_jack_conf.en_mic_int != -1)
+		gpio_set_value_cansleep(tegra_wired_jack_conf.en_mic_int,
+					SND_SOC_DAPM_EVENT_ON(event));
+
+	if (tegra_wired_jack_conf.en_mic_ext != -1)
+		gpio_set_value_cansleep(tegra_wired_jack_conf.en_mic_ext,
+					!(SND_SOC_DAPM_EVENT_ON(event)));
+
+	return 0;
+}
+
+static int tegra_dapm_event_ext_mic(struct snd_soc_dapm_widget* w,
+				    struct snd_kcontrol* k, int event)
+{
+	if (tegra_wired_jack_conf.en_mic_ext != -1)
+		gpio_set_value_cansleep(tegra_wired_jack_conf.en_mic_ext,
+					SND_SOC_DAPM_EVENT_ON(event));
+
+	if (tegra_wired_jack_conf.en_mic_int != -1)
+		gpio_set_value_cansleep(tegra_wired_jack_conf.en_mic_int,
+					!(SND_SOC_DAPM_EVENT_ON(event)));
+
+	return 0;
+}
+
 /*tegra machine dapm widgets */
 static const struct snd_soc_dapm_widget tegra_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("Headphone Jack", NULL),
-	SND_SOC_DAPM_MIC("Mic Jack", NULL),
+	SND_SOC_DAPM_MIC("Mic Jack", tegra_dapm_event_ext_mic),
+	SND_SOC_DAPM_MIC("Int Mic", tegra_dapm_event_int_mic),
 	SND_SOC_DAPM_SPK("Lineout", NULL),
 	SND_SOC_DAPM_SPK("Int Spk", tegra_dapm_event_int_spk),
 	SND_SOC_DAPM_LINE("Line Jack", NULL),
@@ -193,11 +222,15 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"Lineout", NULL, "LINEOUTR"},
 	{"Lineout", NULL, "LINEOUTL"},
 
-	/* mic is connected to MICIN (via right channel of headphone jack) */
+	/* external mic is stero */
 	{"IN1L", NULL, "Mic Jack"},
+	{"IN1R", NULL, "Mic Jack"},
 
-	/* Same as the above but no mic bias for line signals */
-	{"IN2L", NULL, "Line Jack"},
+	/* internal mic is mono */
+	{"IN1R", NULL, "Int Mic"},
+
+	{"IN3L", NULL, "Line Jack"},
+	{"IN3R", NULL, "Line Jack"},
 };
 
 static const char *jack_function[] = {"Headphone", "Mic", "Line", "Headset",
