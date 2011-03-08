@@ -56,6 +56,7 @@ struct tegra_audio_platform_data {
 	int dsp_bus_width; /* 16-bit for DSP data format */
 	int mask; /* enable tx and rx? */
 	bool stereo_capture; /* True if hardware supports stereo */
+	bool en_dmic; /* True if digital mic is default*/
 	void *driver_data;
 };
 

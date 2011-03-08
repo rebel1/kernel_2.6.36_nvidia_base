@@ -19,6 +19,8 @@
 
 #include "tegra_soc.h"
 
+int en_dmic;
+
 /* i2s controller */
 struct tegra_i2s_info {
 	struct platform_device *pdev;
@@ -293,6 +295,9 @@ static int i2s_configure(struct tegra_i2s_info *info )
 	i2s_set_bit_format(i2s_id, pdata->mode);
 	i2s_set_bit_size(i2s_id, pdata->bit_size);
 	i2s_set_fifo_format(i2s_id, pdata->fifo_fmt);
+
+	if (i2s_id == 0)
+		en_dmic = pdata->en_dmic;
 
 	return 0;
 }

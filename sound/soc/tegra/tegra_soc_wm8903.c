@@ -19,9 +19,12 @@
 #include <linux/gpio.h>
 #include <sound/soc-dapm.h>
 #include <linux/regulator/consumer.h>
+#include <linux/sysfs.h>
 #include "../codecs/wm8903.h"
 
 static struct platform_device *tegra_snd_device;
+
+extern int en_dmic;
 
 extern struct snd_soc_dai tegra_i2s_dai[];
 extern struct snd_soc_dai tegra_spdif_dai;
@@ -47,8 +50,81 @@ extern struct wired_jack_conf tegra_wired_jack_conf;
 #define B04_ADC_HPF_ENA		4
 #define R20_SIDETONE_CTRL	32
 #define R29_DRC_1		41
+
+#define B08_GPx_FN		8
+#define B07_GPx_DIR		7
+
+#define DMIC_CLK_OUT		(0x6 << B08_GPx_FN)
+#define DMIC_DAT_DATA_IN	(0x6 << B08_GPx_FN)
+#define GPIO_DIR_OUT		(0x0 << B07_GPx_DIR)
+#define GPIO_DIR_IN			(0x1 << B07_GPx_DIR)
+
+#define ADC_DIGITAL_VOL_9DB		0x1D8
+#define ADC_DIGITAL_VOL_12DB	0x1E0
+#define ADC_ANALOG_VOLUME		0x1C
+#define DRC_MAX_36DB			0x03
+
 #define SET_REG_VAL(r,m,l,v) (((r)&(~((m)<<(l))))|(((v)&(m))<<(l)))
 
+static ssize_t digital_mic_show(struct device *dev,
+				struct device_attribute *attr,
+				char *buf)
+{
+	return sprintf(buf, "%d\n", en_dmic);
+}
+
+static ssize_t digital_mic_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	if (count > 3) {
+		pr_err("%s: buffer size %d too big\n", __func__, count);
+		return -EINVAL;
+	}
+
+	if (sscanf(buf, "%d", &en_dmic) != 1) {
+		pr_err("%s: invalid input string [%s]\n", __func__, buf);
+		return -EINVAL;
+	}
+	return count;
+}
+
+static DEVICE_ATTR(enable_digital_mic, 0644, digital_mic_show, digital_mic_store);
+
+static void configure_dmic(struct snd_soc_codec *codec)
+{
+	u16 test4, reg;
+
+	if (en_dmic) {
+		/* Set GP1_FN as DMIC_LR */
+		snd_soc_write(codec, WM8903_GPIO_CONTROL_1,
+					DMIC_CLK_OUT | GPIO_DIR_OUT);
+
+		/* Set GP2_FN as DMIC_DAT */
+		snd_soc_write(codec, WM8903_GPIO_CONTROL_2,
+					DMIC_DAT_DATA_IN | GPIO_DIR_IN);
+
+		/* Enable ADC Digital volumes */
+		snd_soc_write(codec, WM8903_ADC_DIGITAL_VOLUME_LEFT,
+					ADC_DIGITAL_VOL_9DB);
+		snd_soc_write(codec, WM8903_ADC_DIGITAL_VOLUME_RIGHT,
+					ADC_DIGITAL_VOL_9DB);
+
+		/* Enable DIG_MIC */
+		test4 = WM8903_ADC_DIG_MIC;
+	} else {
+		/* Disable DIG_MIC */
+		test4 = snd_soc_read(codec, WM8903_CLOCK_RATE_TEST_4);
+		test4 &= ~WM8903_ADC_DIG_MIC;
+	}
+
+	reg = snd_soc_read(codec, WM8903_CONTROL_INTERFACE_TEST_1);
+	snd_soc_write(codec, WM8903_CONTROL_INTERFACE_TEST_1,
+			 reg | WM8903_TEST_KEY);
+	snd_soc_write(codec, WM8903_CLOCK_RATE_TEST_4, test4);
+	snd_soc_write(codec, WM8903_CONTROL_INTERFACE_TEST_1, reg);
+
+}
 
 static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
@@ -104,7 +180,6 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 		int CtrlReg = 0;
 		int VolumeCtrlReg = 0;
 		int SidetoneCtrlReg = 0;
-		int SideToneAtenuation = 0;
 
 		snd_soc_write(codec, WM8903_ANALOGUE_LEFT_INPUT_0, 0X7);
 		snd_soc_write(codec, WM8903_ANALOGUE_RIGHT_INPUT_0, 0X7);
@@ -149,6 +224,9 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 		CtrlReg = snd_soc_read(codec, R29_DRC_1);
 		CtrlReg |= 0x3; /*mic volume 18 db */
 		snd_soc_write(codec, R29_DRC_1, CtrlReg);
+
+		configure_dmic(codec);
+
 	}
 
 	return 0;
@@ -528,6 +606,15 @@ static int __init tegra_init(void)
 	if (ret) {
 		pr_err("audio device could not be added \n");
 		goto fail;
+	}
+
+	ret = device_create_file(&tegra_snd_device->dev,
+							&dev_attr_enable_digital_mic);
+	if (ret < 0) {
+		dev_err(&tegra_snd_device->dev,
+				"%s: could not create sysfs entry %s: %d\n",
+				__func__, dev_attr_enable_digital_mic.attr.name, ret);
+		return ret;
 	}
 
 	return 0;

@@ -417,6 +417,7 @@ static struct tegra_audio_platform_data tegra_audio_pdata[] = {
 		.bit_size	= I2S_BIT_SIZE_16,
 		.i2s_bus_width = 32,
 		.dsp_bus_width = 16,
+		.en_dmic = false, /* by default analog mic is used */
 	},
 	/* For I2S2 */
 	[1] = {
