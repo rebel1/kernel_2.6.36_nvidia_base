@@ -1297,8 +1297,6 @@ static void tegra_dc_reset_worker(struct work_struct *work)
 	msleep(5);
 
 	tegra_periph_reset_assert(dc->clk);
-	udelay(100);
-	tegra_periph_reset_deassert(dc->clk);
 	msleep(2);
 
 	if (dc->ndev->id == 0 && tegra_dcs[1] != NULL) {
@@ -1309,6 +1307,7 @@ static void tegra_dc_reset_worker(struct work_struct *work)
 		mutex_unlock(&tegra_dcs[0]->lock);
 	}
 
+	/* _tegra_dc_enable deasserts reset */
 	_tegra_dc_controller_enable(dc);
 
 	dc->enabled = true;
