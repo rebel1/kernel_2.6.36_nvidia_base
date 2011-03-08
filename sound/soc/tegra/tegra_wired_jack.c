@@ -19,6 +19,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/gpio.h>
 #include <linux/switch.h>
 #include <linux/notifier.h>
 #include <sound/jack.h>
@@ -28,6 +29,10 @@
 #include "tegra_soc.h"
 
 #define HEAD_DET_GPIO 0
+
+struct wired_jack_conf tegra_wired_jack_conf = {
+	-1, -1, -1, -1
+};
 
 /* jack */
 static struct snd_soc_jack *tegra_wired_jack;
@@ -97,10 +102,11 @@ static int tegra_wired_jack_probe(struct platform_device *pdev)
 {
 	int ret;
 	int hp_det_n;
+	int en_spkr;
 	struct tegra_wired_jack_conf *pdata;
 
 	pdata = (struct tegra_wired_jack_conf *)pdev->dev.platform_data;
-	if (!pdata || !pdata->hp_det_n) {
+	if (!pdata || !pdata->hp_det_n || !pdata->en_spkr) {
 		pr_err("Please set up gpio pins for jack.\n");
 		return -EBUSY;
 	}
@@ -118,6 +124,19 @@ static int tegra_wired_jack_probe(struct platform_device *pdev)
 					hs_jack_gpios);
 		return ret;
 	}
+
+	en_spkr = pdata->en_spkr;
+	ret = gpio_request(en_spkr, "en_spkr");
+	if (ret) {
+		pr_err("Could NOT set up gpio pin for amplifier.\n");
+		gpio_free(en_spkr);
+	}
+	gpio_direction_output(en_spkr, 0);
+	gpio_export(en_spkr, false);
+
+	/* restore configuration of these pins */
+	tegra_wired_jack_conf.hp_det_n = hp_det_n;
+	tegra_wired_jack_conf.en_spkr = en_spkr;
 
 	return 0;
 }

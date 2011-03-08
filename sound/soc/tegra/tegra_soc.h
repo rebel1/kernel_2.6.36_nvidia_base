@@ -104,6 +104,13 @@ struct tegra_audio_data {
 	bool is_call_mode;
 };
 
+struct wired_jack_conf {
+	int hp_det_n;
+	int en_mic_int;
+	int en_mic_ext;
+	int en_spkr;
+};
+
 int tegra_controls_init(struct snd_soc_codec *codec);
 void tegra_controls_exit(void);
 
