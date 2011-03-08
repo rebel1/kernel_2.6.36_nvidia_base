@@ -227,16 +227,8 @@ struct tegra_xtal_freq {
 	u8 enable_delay;
 	u8 stable_count;
 	u8 active_delay;
-	u8 xtal_freq_count;
+	u16 xtal_freq_count;
 	u16 debounce;
-};
-
-static const u16 uhsic_delay_table[][4] = {
-	/* ENABLE_DLY, STABLE_CNT, ACTIVE_DLY, XTAL_FREQ_CNT */
-	{0x02,         0x2F,       0x0,       0x1CA}, /* 12 MHz */
-	{0x02,         0x33,       0x0,       0x1F0}, /* 13 MHz */
-	{0x03,         0x4B,       0x0,       0x2DD}, /* 19.2 MHz */
-	{0x04,         0x66,       0x0,       0x3E0}, /* 26 Mhz */
 };
 
 static const struct tegra_xtal_freq tegra_freq_table[] = {
@@ -271,6 +263,37 @@ static const struct tegra_xtal_freq tegra_freq_table[] = {
 		.active_delay = 0x09,
 		.xtal_freq_count = 0xFE,
 		.debounce = 0xFDE8,
+	},
+};
+
+static const struct tegra_xtal_freq tegra_uhsic_freq_table[] = {
+	{
+		.freq = 12000000,
+		.enable_delay = 0x02,
+		.stable_count = 0x2F,
+		.active_delay = 0x0,
+		.xtal_freq_count = 0x1CA,
+	},
+	{
+		.freq = 13000000,
+		.enable_delay = 0x02,
+		.stable_count = 0x33,
+		.active_delay = 0x0,
+		.xtal_freq_count = 0x1F0,
+	},
+	{
+		.freq = 19200000,
+		.enable_delay = 0x03,
+		.stable_count = 0x4B,
+		.active_delay = 0x0,
+		.xtal_freq_count = 0x2DD,
+	},
+	{
+		.freq = 26000000,
+		.enable_delay = 0x04,
+		.stable_count = 0x66,
+		.active_delay = 0x0,
+		.xtal_freq_count = 0x3E0,
 	},
 };
 
@@ -794,7 +817,7 @@ static void ulpi_phy_power_off(struct tegra_usb_phy *phy)
 	clk_disable(phy->clk);
 }
 
-static void null_phy_power_on(struct tegra_usb_phy *phy)
+static int null_phy_power_on(struct tegra_usb_phy *phy)
 {
 	const struct tegra_ulpi_trimmer default_trimmer = {0, 0, 4, 4};
 	unsigned long val;
@@ -884,6 +907,8 @@ static void null_phy_power_on(struct tegra_usb_phy *phy)
 
 	if (config->postinit)
 		config->postinit();
+
+	return 0;
 }
 
 static void null_phy_power_off(struct tegra_usb_phy *phy)
@@ -896,7 +921,7 @@ static void null_phy_power_off(struct tegra_usb_phy *phy)
 	writel(val, base + ULPI_TIMING_CTRL_0);
 }
 
-static void uhsic_phy_power_on(struct tegra_usb_phy *phy)
+static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 {
 	unsigned long val;
 	void __iomem *base = phy->regs;
@@ -937,12 +962,12 @@ static void uhsic_phy_power_on(struct tegra_usb_phy *phy)
 	writel(val, base + UHSIC_MISC_CFG0);
 
 	val = readl(base + UHSIC_MISC_CFG1);
-	val |= UHSIC_PLLU_STABLE_COUNT(uhsic_delay_table[phy->freq_sel][1]);
+	val |= UHSIC_PLLU_STABLE_COUNT(phy->freq->stable_count);
 	writel(val, base + UHSIC_MISC_CFG1);
 
 	val = readl(base + UHSIC_PLL_CFG1);
-	val |= UHSIC_PLLU_ENABLE_DLY_COUNT(uhsic_delay_table[phy->freq_sel][0]);
-	val |= UHSIC_XTAL_FREQ_COUNT(uhsic_delay_table[phy->freq_sel][3]);
+	val |= UHSIC_PLLU_ENABLE_DLY_COUNT(phy->freq->enable_delay);
+	val |= UHSIC_XTAL_FREQ_COUNT(phy->freq->xtal_freq_count);
 	writel(val, base + UHSIC_PLL_CFG1);
 
 	val = readl(base + USB_SUSP_CTRL);
@@ -968,6 +993,8 @@ static void uhsic_phy_power_on(struct tegra_usb_phy *phy)
 							USB_PHY_CLK_VALID)) {
 		pr_err("%s: timeout waiting for phy to stabilize\n", __func__);
 	}
+
+	return 0;
 }
 
 static void uhsic_phy_power_off(struct tegra_usb_phy *phy)
@@ -1011,6 +1038,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	unsigned long parent_rate;
 	int i;
 	int err;
+	bool hsic = false;
 
 	phy = kmalloc(sizeof(struct tegra_usb_phy), GFP_KERNEL);
 	if (!phy)
@@ -1032,6 +1060,11 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		}
 	}
 
+	if (phy_is_ulpi(phy)) {
+		ulpi_config = config;
+		hsic = (ulpi_config->inf_type == TEGRA_USB_UHSIC);
+	}
+
 	phy->pll_u = clk_get_sys(NULL, "pll_u");
 	if (IS_ERR(phy->pll_u)) {
 		pr_err("Can't get pll_u clock\n");
@@ -1041,10 +1074,19 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	clk_enable(phy->pll_u);
 
 	parent_rate = clk_get_rate(clk_get_parent(phy->pll_u));
-	for (i = 0; i < ARRAY_SIZE(tegra_freq_table); i++) {
-		if (tegra_freq_table[i].freq == parent_rate) {
-			phy->freq = &tegra_freq_table[i];
-			break;
+	if (hsic) {
+		for (i = 0; i < ARRAY_SIZE(tegra_uhsic_freq_table); i++) {
+			if (tegra_uhsic_freq_table[i].freq == parent_rate) {
+				phy->freq = &tegra_uhsic_freq_table[i];
+				break;
+			}
+		}
+	} else {
+		for (i = 0; i < ARRAY_SIZE(tegra_freq_table); i++) {
+			if (tegra_freq_table[i].freq == parent_rate) {
+				phy->freq = &tegra_freq_table[i];
+				break;
+			}
 		}
 	}
 	if (!phy->freq) {
@@ -1052,7 +1094,6 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 		err = -EINVAL;
 		goto err1;
 	}
-	phy->freq_sel = i;
 
 	if (phy_is_ulpi(phy)) {
 		ulpi_config = config;
@@ -1112,15 +1153,13 @@ int tegra_usb_phy_power_on(struct tegra_usb_phy *phy)
 	if (phy_is_ulpi(phy)) {
 		struct tegra_ulpi_config *ulpi_config = phy->config;
 		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
-			ulpi_phy_power_on(phy);
-		else if (ulpi_config->inf_type == TEGRA_USB_NULL_ULPI)
-			null_phy_power_on(phy);
+			return ulpi_phy_power_on(phy);
 		else if (ulpi_config->inf_type == TEGRA_USB_UHSIC)
-			uhsic_phy_power_on(phy);
-	} else {
-		utmi_phy_power_on(phy);
-	}
-	return 0;
+			return uhsic_phy_power_on(phy);
+		else
+			return null_phy_power_on(phy);
+	} else
+		return utmi_phy_power_on(phy);
 }
 
 void tegra_usb_phy_power_off(struct tegra_usb_phy *phy)
@@ -1129,13 +1168,12 @@ void tegra_usb_phy_power_off(struct tegra_usb_phy *phy)
 		struct tegra_ulpi_config *ulpi_config = phy->config;
 		if (ulpi_config->inf_type == TEGRA_USB_LINK_ULPI)
 			ulpi_phy_power_off(phy);
-		else if (ulpi_config->inf_type == TEGRA_USB_NULL_ULPI)
-			null_phy_power_off(phy);
 		else if (ulpi_config->inf_type == TEGRA_USB_UHSIC)
 			uhsic_phy_power_off(phy);
-	} else {
+		else
+			null_phy_power_off(phy);
+	} else
 		utmi_phy_power_off(phy);
-	}
 
 	if (phy->regulator_on && (tegra_get_revision() >= TEGRA_REVISION_A03)) {
 		regulator_disable(phy->reg_vdd);
@@ -1203,8 +1241,7 @@ int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 	struct tegra_ulpi_config *config = phy->config;
 
-	if ((phy->instance == 1) &&
-		(config->inf_type == TEGRA_USB_UHSIC)) {
+	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
 
 		val = readl(base + UHSIC_MISC_CFG0);
 		val |= UHSIC_DETECT_SHORT_CONNECT;
@@ -1240,8 +1277,7 @@ int tegra_usb_phy_bus_reset(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 	struct tegra_ulpi_config *config = phy->config;
 
-	if ((phy->instance == 1) &&
-		(config->inf_type == TEGRA_USB_UHSIC)) {
+	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
 
 		val = readl(base + USB_PORTSC1);
 		val |= USB_PORTSC1_PTC(5);
@@ -1312,8 +1348,7 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 	struct tegra_ulpi_config *config = phy->config;
 
-	if ((phy->instance == 1) &&
-		(config->inf_type == TEGRA_USB_UHSIC)) {
+	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
 
 		val = readl(base + UHSIC_MISC_CFG0);
 		val |= UHSIC_DETECT_SHORT_CONNECT;
@@ -1337,8 +1372,7 @@ bool tegra_usb_phy_is_device_connected(struct tegra_usb_phy *phy)
 	void __iomem *base = phy->regs;
 	struct tegra_ulpi_config *config = phy->config;
 
-	if ((phy->instance == 1) &&
-		(config->inf_type == TEGRA_USB_UHSIC)) {
+	if (phy_is_ulpi(phy) && (config->inf_type == TEGRA_USB_UHSIC)) {
 		if (!((readl(base + UHSIC_STAT_CFG0) & UHSIC_CONNECT_DETECT) == UHSIC_CONNECT_DETECT)) {
 			pr_err("%s: hsic no device connection\n", __func__);
 			return false;
