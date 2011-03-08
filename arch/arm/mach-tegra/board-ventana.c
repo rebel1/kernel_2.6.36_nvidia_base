@@ -333,12 +333,16 @@ static struct platform_device rndis_device = {
 #endif
 
 static struct wm8903_platform_data wm8903_pdata = {
+	.irq_active_low = 0,
+	.micdet_cfg = 0x83,           /* enable mic bias current */
+	.micdet_delay = 0,
 	.gpio_base = WM8903_GPIO_BASE,
 	.gpio_cfg = {
 		WM8903_GPIO_NO_CONFIG,
 		WM8903_GPIO_NO_CONFIG,
 		0,                     /* as output pin */
-		WM8903_GPIO_NO_CONFIG,
+		WM8903_GPn_FN_GPIO_MICBIAS_CURRENT_DETECT
+		<< WM8903_GP4_FN_SHIFT, /* as micbias current detect */
 		WM8903_GPIO_NO_CONFIG,
 	},
 };
@@ -347,7 +351,6 @@ static struct i2c_board_info __initdata ventana_i2c_bus1_board_info[] = {
 	{
 		I2C_BOARD_INFO("wm8903", 0x1a),
 		.platform_data = &wm8903_pdata,
-		.irq = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PX3),
 	},
 };
 
