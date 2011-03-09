@@ -250,10 +250,12 @@ static int das_set_pin_state(bool normal)
 			/* Enable the DAP outputs */
 			tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP1,
 						TEGRA_TRI_NORMAL);
-			tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV1,
-					TEGRA_TRI_NORMAL);
-			tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV2,
-					TEGRA_TRI_NORMAL);
+			tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP2,
+						TEGRA_TRI_NORMAL);
+			tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP3,
+						TEGRA_TRI_NORMAL);
+			tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP4,
+						TEGRA_TRI_NORMAL);
 		}
 		das_drv_data->tristate_count++;
 	} else {
@@ -262,9 +264,11 @@ static int das_set_pin_state(bool normal)
 		if (das_drv_data->tristate_count == 0) {
 			tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP1,
 					TEGRA_TRI_TRISTATE);
-			tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV1,
+			tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP2,
 					TEGRA_TRI_TRISTATE);
-			tegra_pinmux_set_tristate(TEGRA_PINGROUP_CDEV2,
+			tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP3,
+					TEGRA_TRI_TRISTATE);
+			tegra_pinmux_set_tristate(TEGRA_PINGROUP_DAP4,
 					TEGRA_TRI_TRISTATE);
 		}
 	}
