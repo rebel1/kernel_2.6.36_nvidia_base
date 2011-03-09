@@ -389,4 +389,45 @@
 		((0x1f) << SPDIF_DATA_FIFO_CSR_0_TD_EMPTY_COUNT_SHIFT)
 
 
+struct spdif_regs_cache {
+	int spdif_ctrl_0;
+	int spdif_status_0;
+	int spdif_strobe_ctrl_0;
+	int spdif_data_fifo_scr_0;
+	int spdif_ch_sta_rx_a_0;
+	int spdif_ch_sta_rx_b_0;
+	int spdif_ch_sta_rx_c_0;
+	int spdif_ch_sta_rx_d_0;
+	int spdif_ch_sta_rx_e_0;
+	int spdif_ch_sta_rx_f_0;
+	int spdif_ch_sta_tx_a_0;
+	int spdif_ch_sta_tx_b_0;
+	int spdif_ch_sta_tx_c_0;
+	int spdif_ch_sta_tx_d_0;
+	int spdif_ch_sta_tx_e_0;
+	int spdif_ch_sta_tx_f_0;
+	int spdif_usr_sta_rx_a_0;
+	int spdif_usr_dat_tx_a_0;
+};
+
+/* spdif apis */
+void spdif_fifo_enable(unsigned long base, int mode, int on);
+int spdif_set_bit_mode(unsigned long base, unsigned mode);
+int spdif_set_fifo_packed(unsigned long base, unsigned on);
+int spdif_set_sample_rate(unsigned long base, unsigned int sample_rate);
+void spdif_fifo_write(unsigned long base, int mode, u32 data);
+int spdif_fifo_set_attention_level(unsigned long base,
+					int mode,
+					unsigned int level);
+void spdif_fifo_clear(unsigned long base, int mode);
+u32 spdif_get_status(unsigned long base);
+u32 spdif_get_control(unsigned long base);
+void spdif_ack_status(unsigned long base);
+u32 spdif_get_fifo_scr(unsigned long base);
+phys_addr_t spdif_get_fifo_phy_base(phys_addr_t phy_base, int mode);
+u32 spdif_get_fifo_full_empty_count(unsigned long base, int mode);
+int spdif_initialize(unsigned long base, int mode);
+void spdif_get_all_regs(unsigned long base, struct spdif_regs_cache* regs);
+void spdif_set_all_regs(unsigned long base, struct spdif_regs_cache* regs);
+
 #endif /* __ARCH_ARM_MACH_TEGRA_SPDIF_H */

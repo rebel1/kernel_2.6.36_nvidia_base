@@ -45,6 +45,7 @@
 #include <mach/iomap.h>
 #include <mach/io.h>
 #include <mach/i2s.h>
+#include <mach/spdif.h>
 #include <mach/audio.h>
 
 #include <asm/mach-types.h>
@@ -147,6 +148,7 @@ static __initdata struct tegra_clk_init_table whistler_clk_init_table[] = {
 	{ "i2s2",	"pll_a_out0",	11289600,	true},
 	{ "audio",	"pll_a_out0",	11289600,	true},
 	{ "audio_2x",	"audio",	22579200,	true},
+	{ "spdif_out",	"pll_a_out0",	5644800,	false},
 	{ "sdmmc2",	"pll_p",	25000000,	false},
 	{ NULL,		NULL,		0,		0},
 };
@@ -307,6 +309,10 @@ static void whistler_i2c_init(void)
 	platform_device_register(&tegra_i2c_device1);
 }
 
+static struct tegra_audio_platform_data tegra_spdif_pdata = {
+	.dma_on = true,  /* use dma by default */
+	.spdif_clk_rate = 5644800,
+};
 
 static struct tegra_audio_platform_data tegra_audio_pdata[] = {
 	/* For I2S1 */
@@ -391,6 +397,7 @@ static struct platform_device *whistler_devices[] __initdata = {
 	&tegra_camera,
 	&tegra_i2s_device1,
 	&tegra_i2s_device2,
+	&tegra_spdif_device,
 	&tegra_das_device,
 };
 
@@ -549,6 +556,7 @@ static void __init tegra_whistler_init(void)
 	andusb_plat.serial_number = kstrdup(serial, GFP_KERNEL);
 	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata[0];
 	tegra_i2s_device2.dev.platform_data = &tegra_audio_pdata[1];
+	tegra_spdif_device.dev.platform_data = &tegra_spdif_pdata;
 	platform_add_devices(whistler_devices, ARRAY_SIZE(whistler_devices));
 
 	tegra_das_device.dev.platform_data = &tegra_das_pdata;

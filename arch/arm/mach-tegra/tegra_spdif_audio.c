@@ -166,193 +166,21 @@ static inline void allow_suspend(struct audio_stream *as)
 	schedule_work(&as->allow_suspend_work);
 }
 
-#define I2S_I2S_FIFO_TX_BUSY	I2S_I2S_STATUS_FIFO1_BSY
-#define I2S_I2S_FIFO_TX_QS	I2S_I2S_STATUS_QS_FIFO1
-#define I2S_I2S_FIFO_TX_ERR	I2S_I2S_STATUS_FIFO1_ERR
-
-#define I2S_I2S_FIFO_RX_BUSY	I2S_I2S_STATUS_FIFO2_BSY
-#define I2S_I2S_FIFO_RX_QS	I2S_I2S_STATUS_QS_FIFO2
-#define I2S_I2S_FIFO_RX_ERR	I2S_I2S_STATUS_FIFO2_ERR
-
-#define I2S_FIFO_ERR (I2S_I2S_STATUS_FIFO1_ERR | I2S_I2S_STATUS_FIFO2_ERR)
-
-
-static inline void spdif_writel(unsigned long base, u32 val, u32 reg)
-{
-	writel(val, base + reg);
-}
-
-static inline u32 spdif_readl(unsigned long base, u32 reg)
-{
-	return readl(base + reg);
-}
-
-static inline void spdif_fifo_write(unsigned long base, u32 data)
-{
-	spdif_writel(base, data, SPDIF_DATA_OUT_0);
-}
-
-static int spdif_fifo_set_attention_level(unsigned long base,
-			unsigned level)
-{
-	u32 val;
-
-	if (level > SPDIF_FIFO_ATN_LVL_TWELVE_SLOTS) {
-		pr_err("%s: invalid fifo level selector %d\n", __func__,
-			level);
-		return -EINVAL;
-	}
-
-	val = spdif_readl(base, SPDIF_DATA_FIFO_CSR_0);
-
-	val &= ~SPDIF_DATA_FIFO_CSR_0_TX_ATN_LVL_MASK;
-	val |= level << SPDIF_DATA_FIFO_CSR_0_TX_ATN_LVL_SHIFT;
-
-
-	spdif_writel(base, val, SPDIF_DATA_FIFO_CSR_0);
-	return 0;
-}
-
-static void spdif_fifo_enable(unsigned long base, int on)
-{
-	u32 val = spdif_readl(base, SPDIF_CTRL_0);
-	val &= ~(SPDIF_CTRL_0_TX_EN | SPDIF_CTRL_0_TC_EN | SPDIF_CTRL_0_TU_EN);
-	val |= on ? (SPDIF_CTRL_0_TX_EN) : 0;
-	val |= on ? (SPDIF_CTRL_0_TC_EN) : 0;
-
-	spdif_writel(base, val, SPDIF_CTRL_0);
-}
-#if 0
-static bool spdif_is_fifo_enabled(unsigned long base)
-{
-	u32 val = spdif_readl(base, SPDIF_CTRL_0);
-	return !!(val & SPDIF_CTRL_0_TX_EN);
-}
-#endif
-
-static void spdif_fifo_clear(unsigned long base)
-{
-	u32 val = spdif_readl(base, SPDIF_DATA_FIFO_CSR_0);
-	val &= ~(SPDIF_DATA_FIFO_CSR_0_TX_CLR | SPDIF_DATA_FIFO_CSR_0_TU_CLR);
-	val |= SPDIF_DATA_FIFO_CSR_0_TX_CLR | SPDIF_DATA_FIFO_CSR_0_TU_CLR;
-	spdif_writel(base, val, SPDIF_DATA_FIFO_CSR_0);
-}
-
-
-static int spdif_set_bit_mode(unsigned long base, unsigned mode)
-{
-	u32 val = spdif_readl(base, SPDIF_CTRL_0);
-	val &= ~SPDIF_CTRL_0_BIT_MODE_MASK;
-
-	if (mode > SPDIF_BIT_MODE_MODERAW) {
-		pr_err("%s: invalid bit_size selector %d\n", __func__,
-			mode);
-		return -EINVAL;
-	}
-
-	val |= mode << SPDIF_CTRL_0_BIT_MODE_SHIFT;
-
-	spdif_writel(base, val, SPDIF_CTRL_0);
-	return 0;
-}
-
-static int spdif_set_fifo_packed(unsigned long base, unsigned on)
-{
-	u32 val = spdif_readl(base, SPDIF_CTRL_0);
-	val &= ~SPDIF_CTRL_0_PACK;
-	val |= on ? SPDIF_CTRL_0_PACK : 0;
-	spdif_writel(base, val, SPDIF_CTRL_0);
-	return 0;
-}
-
-#if 0
-static void spdif_set_fifo_irq_on_err(unsigned long base, int on)
-{
-	u32 val = spdif_readl(base, SPDIF_CTRL_0);
-	val &= ~SPDIF_CTRL_0_IE_TXE;
-	val |= on ? SPDIF_CTRL_0_IE_TXE : 0;
-	spdif_writel(base, val, SPDIF_CTRL_0);
-}
-#endif
-
-
-static void spdif_enable_fifos(unsigned long base, int on)
-{
-	u32 val = spdif_readl(base, SPDIF_CTRL_0);
-	if (on)
-		val |= SPDIF_CTRL_0_TX_EN | SPDIF_CTRL_0_TC_EN |
-		       SPDIF_CTRL_0_IE_TXE;
-	else
-		val &= ~(SPDIF_CTRL_0_TX_EN | SPDIF_CTRL_0_TC_EN |
-			 SPDIF_CTRL_0_IE_TXE);
-
-	spdif_writel(base, val, SPDIF_CTRL_0);
-}
-
-static inline u32 spdif_get_status(unsigned long base)
-{
-	return spdif_readl(base, SPDIF_STATUS_0);
-}
-
-static inline u32 spdif_get_control(unsigned long base)
-{
-	return spdif_readl(base, SPDIF_CTRL_0);
-}
-
-static inline void spdif_ack_status(unsigned long base)
-{
-	return spdif_writel(base, spdif_readl(base, SPDIF_STATUS_0),
-				SPDIF_STATUS_0);
-}
-
-static inline u32 spdif_get_fifo_scr(unsigned long base)
-{
-	return spdif_readl(base, SPDIF_DATA_FIFO_CSR_0);
-}
-
-static inline phys_addr_t spdif_get_fifo_phy_base(unsigned long phy_base)
-{
-	return phy_base + SPDIF_DATA_OUT_0;
-}
-
-static inline u32 spdif_get_fifo_full_empty_count(unsigned long base)
-{
-	u32 val = spdif_readl(base, SPDIF_DATA_FIFO_CSR_0);
-	val = val >> SPDIF_DATA_FIFO_CSR_0_TD_EMPTY_COUNT_SHIFT;
-	return val & SPDIF_DATA_FIFO_CSR_0_TD_EMPTY_COUNT_MASK;
-}
-
-
-static int spdif_set_sample_rate(struct audio_driver_state *state,
+static int set_spdif_clock(struct audio_driver_state *state,
 				unsigned int sample_rate)
 {
 	unsigned int clock_freq = 0;
 	struct clk *spdif_clk;
 
-	unsigned int ch_sta[] = {
-		0x0, /* 44.1, default values */
-		0x0,
-		0x0,
-		0x0,
-		0x0,
-		0x0,
-	};
-
 	switch (sample_rate) {
 	case 32000:
 		clock_freq = 4096000; /* 4.0960 MHz */
-		ch_sta[0] = 0x3 << 24;
-		ch_sta[1] = 0xC << 4;
 		break;
 	case 44100:
 		clock_freq = 5644800; /* 5.6448 MHz */
-		ch_sta[0] = 0x0;
-		ch_sta[1] = 0xF << 4;
 		break;
 	case 48000:
 		clock_freq = 6144000; /* 6.1440MHz */
-		ch_sta[0] = 0x2 << 24;
-		ch_sta[1] = 0xD << 4;
 		break;
 	case 88200:
 		clock_freq = 11289600; /* 11.2896 MHz */
@@ -384,13 +212,6 @@ static int spdif_set_sample_rate(struct audio_driver_state *state,
 		return -EIO;
 	}
 	pr_info("%s: spdif_clk rate %ld\n", __func__, clk_get_rate(spdif_clk));
-
-	spdif_writel(state->spdif_base, ch_sta[0], SPDIF_CH_STA_TX_A_0);
-	spdif_writel(state->spdif_base, ch_sta[1], SPDIF_CH_STA_TX_B_0);
-	spdif_writel(state->spdif_base, ch_sta[2], SPDIF_CH_STA_TX_C_0);
-	spdif_writel(state->spdif_base, ch_sta[3], SPDIF_CH_STA_TX_D_0);
-	spdif_writel(state->spdif_base, ch_sta[4], SPDIF_CH_STA_TX_E_0);
-	spdif_writel(state->spdif_base, ch_sta[5], SPDIF_CH_STA_TX_F_0);
 
 	return 0;
 }
@@ -565,7 +386,7 @@ static void setup_dma_tx_request(struct tegra_dma_req *req,
 	req->complete = dma_tx_complete_callback;
 	req->dev = aos;
 	req->to_memory = false;
-	req->dest_addr = spdif_get_fifo_phy_base(ads->spdif_phys);
+	req->dest_addr = spdif_get_fifo_phy_base(ads->spdif_phys, AUDIO_TX_MODE);
 	req->dest_bus_width = 32;
 	req->dest_wrap = 4;
 	req->source_wrap = 0;
@@ -590,6 +411,7 @@ static int start_playback(struct audio_stream *aos,
 #endif
 
 	spdif_fifo_set_attention_level(ads->spdif_base,
+		AUDIO_TX_MODE,
 		ads->out.spdif_fifo_atn_level);
 
 	if (ads->fifo_init) {
@@ -598,7 +420,7 @@ static int start_playback(struct audio_stream *aos,
 		ads->fifo_init = false;
 	}
 
-	spdif_fifo_enable(ads->spdif_base, 1);
+	spdif_fifo_enable(ads->spdif_base, AUDIO_TX_MODE, 1);
 
 	rc = tegra_dma_enqueue_req(aos->dma_chan, req);
 	spin_unlock_irqrestore(&aos->dma_req_lock, flags);
@@ -614,7 +436,7 @@ static void stop_dma_playback(struct audio_stream *aos)
 	int spin = 0;
 	struct audio_driver_state *ads = ads_from_out(aos);
 	pr_debug("%s\n", __func__);
-	spdif_fifo_enable(ads->spdif_base, 0);
+	spdif_fifo_enable(ads->spdif_base, AUDIO_TX_MODE, 0);
 	while ((spdif_get_status(ads->spdif_base) & SPDIF_STATUS_0_TX_BSY) &&
 			spin < 100) {
 		udelay(10);
@@ -625,7 +447,6 @@ static void stop_dma_playback(struct audio_stream *aos)
 		pr_warn("%s: spinny\n", __func__);
 	ads->fifo_init = true;
 }
-
 
 
 static irqreturn_t spdif_interrupt(int irq, void *data)
@@ -1017,18 +838,14 @@ static int spdif_configure(struct platform_device *pdev)
 	if (!state)
 		return -ENOMEM;
 
-	/* disable interrupts from SPDIF */
-	spdif_writel(state->spdif_base, 0x0, SPDIF_CTRL_0);
-	spdif_fifo_clear(state->spdif_base);
-	spdif_enable_fifos(state->spdif_base, 0);
+	set_spdif_clock(state, 44100);
 
-	spdif_set_bit_mode(state->spdif_base, SPDIF_BIT_MODE_MODE16BIT);
-	spdif_set_fifo_packed(state->spdif_base, 1);
+	spdif_initialize(state->spdif_base, AUDIO_TX_MODE);
 
-	spdif_fifo_set_attention_level(state->spdif_base,
+	spdif_fifo_set_attention_level(state->spdif_base, AUDIO_TX_MODE,
 		state->out.spdif_fifo_atn_level);
 
-	spdif_set_sample_rate(state, 44100);
+	spdif_set_sample_rate(state->spdif_base, 44100);
 
 	state->fifo_init = true;
 	return 0;
