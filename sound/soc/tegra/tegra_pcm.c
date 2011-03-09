@@ -205,6 +205,8 @@ static snd_pcm_uframes_t tegra_pcm_pointer(struct snd_pcm_substream *substream)
 static int tegra_pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
 	struct tegra_runtime_data *prtd = 0;
 	int i, ret=0;
 
@@ -236,11 +238,23 @@ static int tegra_pcm_open(struct snd_pcm_substream *substream)
 
 	prtd->state = STATE_INVALID;
 
-	for (i = 0; i < DMA_REQ_QCOUNT; i++) {
-		setup_dma_request(substream,
-				&prtd->dma_req[i],
-				dma_complete_callback,
-				prtd);
+	if (strcmp(cpu_dai->name, "tegra-spdif") == 0)
+	{
+		for (i = 0; i < DMA_REQ_QCOUNT; i++) {
+			setup_spdif_dma_request(substream,
+					&prtd->dma_req[i],
+					dma_complete_callback,
+					prtd);
+		}
+	}
+	else
+	{
+		for (i = 0; i < DMA_REQ_QCOUNT; i++) {
+			setup_i2s_dma_request(substream,
+					&prtd->dma_req[i],
+					dma_complete_callback,
+					prtd);
+		}
 	}
 
 	prtd->dma_chan = tegra_dma_allocate_channel(TEGRA_DMA_MODE_CONTINUOUS_DOUBLE);

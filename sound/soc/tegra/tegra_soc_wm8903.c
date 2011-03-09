@@ -21,6 +21,7 @@
 static struct platform_device *tegra_snd_device;
 
 extern struct snd_soc_dai tegra_i2s_dai[];
+extern struct snd_soc_dai tegra_spdif_dai;
 extern struct snd_soc_dai tegra_generic_codec_dai[];
 extern struct snd_soc_platform tegra_soc_platform;
 
@@ -177,12 +178,22 @@ static int tegra_voice_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int tegra_spdif_hw_params(struct snd_pcm_substream *substream,
+					struct snd_pcm_hw_params *params)
+{
+	return 0;
+}
+
 static struct snd_soc_ops tegra_hifi_ops = {
 	.hw_params = tegra_hifi_hw_params,
 };
 
 static struct snd_soc_ops tegra_voice_ops = {
 	.hw_params = tegra_voice_hw_params,
+};
+
+static struct snd_soc_ops tegra_spdif_ops = {
+	.hw_params = tegra_spdif_hw_params,
 };
 
 static int tegra_codec_init(struct snd_soc_codec *codec)
@@ -207,7 +218,14 @@ static struct snd_soc_dai_link tegra_soc_dai[] = {
 		.init = tegra_codec_init,
 		.ops = &tegra_voice_ops,
 	},
-
+	{
+		.name = "Tegra-spdif",
+		.stream_name = "Tegra Spdif",
+		.cpu_dai = &tegra_spdif_dai,
+		.codec_dai = &tegra_generic_codec_dai[1],
+		.init = tegra_codec_init,
+		.ops = &tegra_spdif_ops,
+	},
 };
 
 static struct snd_soc_card tegra_snd_soc = {

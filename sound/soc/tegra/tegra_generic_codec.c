@@ -93,13 +93,32 @@ struct snd_soc_dai tegra_generic_codec_dai[] = {
 			.formats        = SNDRV_PCM_FMTBIT_S16_LE,
 		},
 		.ops = &tegra_generic_codec_stub_ops,
+	},
+	{
+		.name = "tegra_generic_spdif_codec",
+		.id = 1,
+		.playback = {
+			.stream_name    = "Playback",
+			.channels_min   = 2,
+			.channels_max   = 2,
+			.rates          = TEGRA_SAMPLE_RATES,
+			.formats        = SNDRV_PCM_FMTBIT_S16_LE,
+		},
+		.capture = {
+			.stream_name    = "Capture",
+			.channels_min   = 2,
+			.channels_max   = 2,
+			.rates          = TEGRA_SAMPLE_RATES,
+			.formats        = SNDRV_PCM_FMTBIT_S16_LE,
+		},
+		.ops = &tegra_generic_codec_stub_ops,
 	}
 };
 EXPORT_SYMBOL_GPL(tegra_generic_codec_dai);
 
 static int generic_codec_init(struct platform_device *pdev)
 {
-	int ret = 0;
+	int i, ret = 0;
 
 	tegra_generic_codec = kzalloc(sizeof(struct snd_soc_codec), GFP_KERNEL);
 	if (!tegra_generic_codec)
@@ -114,7 +133,9 @@ static int generic_codec_init(struct platform_device *pdev)
 	tegra_generic_codec->num_dai = ARRAY_SIZE(tegra_generic_codec_dai);
 	tegra_generic_codec->write = NULL;
 	tegra_generic_codec->read = NULL;
-	tegra_generic_codec_dai[0].dev = &pdev->dev;
+	for (i = 0; i < tegra_generic_codec->num_dai; i++)
+		tegra_generic_codec_dai[i].dev = &pdev->dev;
+
 	INIT_LIST_HEAD(&tegra_generic_codec->dapm_widgets);
 	INIT_LIST_HEAD(&tegra_generic_codec->dapm_paths);
 
@@ -143,6 +164,8 @@ codec_err:
 
 static int generic_codec_remove(struct platform_device *pdev)
 {
+	int i;
+
 	if (!tegra_generic_codec)
 		return 0;
 
@@ -150,7 +173,8 @@ static int generic_codec_remove(struct platform_device *pdev)
 	snd_soc_unregister_codec(tegra_generic_codec);
 	kfree(tegra_generic_codec);
 	tegra_generic_codec = NULL;
-	tegra_generic_codec_dai[0].dev = NULL;
+	for (i = 0; i < tegra_generic_codec->num_dai; i++)
+		tegra_generic_codec_dai[i].dev = NULL;
 
 	return 0;
 }

@@ -36,6 +36,7 @@
 #include <linux/tegra_audio.h>
 #include <mach/iomap.h>
 #include <mach/tegra2_i2s.h>
+#include <mach/spdif.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
 #include <mach/audio.h>
@@ -89,12 +90,8 @@ struct tegra_runtime_data {
 	int dma_reqid_tail;
 	volatile int state;
 	int period_index;
-	int i2s_shutdown;
 	int dma_state;
 	struct tegra_dma_channel *dma_chan;
-	struct clk *i2s_clk;
-	struct clk *dap_mclk;
-	struct clk *audio_sync_clk;
 };
 
 struct tegra_audio_data {
@@ -119,7 +116,11 @@ int tegra_jack_init(struct snd_soc_codec *codec);
 void tegra_jack_exit(void);
 void tegra_switch_set_state(int state);
 
-void setup_dma_request(struct snd_pcm_substream *substream,
+void setup_i2s_dma_request(struct snd_pcm_substream *substream,
+			struct tegra_dma_req *req,
+			void (*dma_callback)(struct tegra_dma_req *req),
+			void *dma_data);
+void setup_spdif_dma_request(struct snd_pcm_substream *substream,
 			struct tegra_dma_req *req,
 			void (*dma_callback)(struct tegra_dma_req *req),
 			void *dma_data);
