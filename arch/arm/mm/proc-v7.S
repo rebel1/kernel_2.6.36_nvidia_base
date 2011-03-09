@@ -238,6 +238,8 @@ __v7_setup:
 2:	ldr	r10, =0x00000c09		@ Cortex-A9 primary part number
 	teq	r0, r10
 	bne	3f
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
+    /* c15,c0,0: read and write in Secure privileged modes, read only in Non-secure state. */
 	cmp	r6, #0x10			@ power ctrl reg added r1p0
 	mrcge	p15, 0, r10, c15, c0, 0		@ read power control register
 	orrge	r10, r10, #1			@ enable dynamic clock gating
@@ -248,7 +250,9 @@ __v7_setup:
 	orreq	r10, r10, #0x30			@ disable core clk gate on
 	mcreq	p15, 0, r10, c15, c0, 2		@ instr-side waits
 #endif
-#ifdef CONFIG_ARM_ERRATA_742230
+#endif
+
+#if defined(CONFIG_ARM_ERRATA_742230) && !defined(CONFIG_TRUSTED_FOUNDATIONS)
 	cmp	r6, #0x22			@ only present up to r2p2
 	mrcle	p15, 0, r10, c15, c0, 1		@ read diagnostic register
 	orrle	r10, r10, #1 << 4		@ set bit #4

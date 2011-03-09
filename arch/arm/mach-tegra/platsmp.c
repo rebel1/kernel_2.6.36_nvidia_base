@@ -75,13 +75,19 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
 #endif
 	spin_unlock(&boot_lock);
 }
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+void callGenericSMC(u32 param0, u32 param1, u32 param2);
+#endif
 
 int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
 	unsigned long old_boot_vector;
 	unsigned long boot_vector;
 	unsigned long timeout;
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
 	u32 reg;
+   static void __iomem *vector_base = (IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100);
+#endif
 
 	/*
 	 * set synchronisation state between this boot processor
@@ -99,8 +105,11 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 
 	smp_wmb();
 
-	old_boot_vector = readl(EVP_CPU_RESET_VECTOR);
-	writel(boot_vector, EVP_CPU_RESET_VECTOR);
+#if CONFIG_TRUSTED_FOUNDATIONS
+	callGenericSMC(0xFFFFFFFC, 0xFFFFFFE5, boot_vector);
+#else
+	old_boot_vector = readl(vector_base);
+	writel(boot_vector, vector_base);
 
 	/* enable cpu clock on cpu */
 	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
@@ -114,13 +123,14 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 
 	timeout = jiffies + HZ;
 	while (time_before(jiffies, timeout)) {
-		if (readl(EVP_CPU_RESET_VECTOR) != boot_vector)
+		if (readl(vector_base) != boot_vector)
 			break;
 		udelay(10);
 	}
 
 	/* put the old boot vector back */
-	writel(old_boot_vector, EVP_CPU_RESET_VECTOR);
+	writel(old_boot_vector, vector_base);
+#endif
 
 	/*
 	 * now the secondary core is starting up let it run its

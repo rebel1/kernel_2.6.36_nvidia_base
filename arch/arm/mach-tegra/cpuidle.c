@@ -205,17 +205,26 @@ static int tegra_tear_down_cpu1(void)
 
 	return 0;
 }
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+void callGenericSMC(u32 param0, u32 param1, u32 param2);
+#endif
 
 static void tegra_wake_cpu1(void)
 {
 	unsigned long boot_vector;
 	unsigned long old_boot_vector;
 	unsigned long timeout;
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
 	u32 reg;
+   static void __iomem *vector_base = (IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100);
+#endif
 
 	boot_vector = virt_to_phys(tegra_hotplug_startup);
-	old_boot_vector = readl(EVP_CPU_RESET_VECTOR);
-	writel(boot_vector, EVP_CPU_RESET_VECTOR);
+#if CONFIG_TRUSTED_FOUNDATIONS
+	callGenericSMC(0xFFFFFFFC, 0xFFFFFFE5, boot_vector);
+#else
+	old_boot_vector = readl(vector_base);
+	writel(boot_vector, vector_base);
 
 	/* enable cpu clock on cpu */
 	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
@@ -227,15 +236,17 @@ static void tegra_wake_cpu1(void)
 	/* unhalt the cpu */
 	writel(0, IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + 0x14);
 
+
 	timeout = jiffies + msecs_to_jiffies(1000);
 	while (time_before(jiffies, timeout)) {
-		if (readl(EVP_CPU_RESET_VECTOR) != boot_vector)
+		if (readl(vector_base) != boot_vector)
 			break;
 		udelay(10);
 	}
 
 	/* put the old boot vector back */
-	writel(old_boot_vector, EVP_CPU_RESET_VECTOR);
+	writel(old_boot_vector, vector_base);
+#endif
 
 	/* CPU1 is now started */
 }
@@ -557,7 +568,7 @@ static int __init tegra_cpuidle_init(void)
 	void __iomem *mask_arm;
 	unsigned int reg;
 	int ret;
-
+   
 	irq_set_affinity(TEGRA_CPUIDLE_BOTH_IDLE, cpumask_of(0));
 	irq_set_affinity(TEGRA_CPUIDLE_TEAR_DOWN, cpumask_of(1));
 

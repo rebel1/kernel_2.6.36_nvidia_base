@@ -56,6 +56,28 @@
 #include "board.h"
 #include "power.h"
 
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+void callGenericSMC(u32 param0, u32 param1, u32 param2)
+{
+	__asm__ volatile(
+		"mov r0, %2\n"
+		"mov r1, %3\n"
+		"mov r2, %4\n"
+		"mov r3, #0\n"
+		"mov r4, #0\n"
+		".word    0xe1600070              @ SMC 0\n"
+		"mov %0, r0\n"
+		"mov %1, r1\n"
+		: "=r" (param0), "=r" (param1)
+		: "r" (param0), "r" (param1),
+		  "r" (param2)
+		: "r0", "r1", "r2", "r3", "r4");
+}
+u32 buffer_rdv[64];
+#endif
+
+/**************** END TL *********************/
+
 struct suspend_context {
 	/*
 	 * The next 7 values are referenced by offset in __restart_plls
@@ -379,6 +401,11 @@ unsigned int tegra_suspend_lp2(unsigned int us)
 	outer_flush_range(__pa(&tegra_sctx),__pa(&tegra_sctx+1));
 	barrier();
 
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+// TRUSTED LOGIC SMC_STOP/Save State
+	callGenericSMC(0xFFFFFFFC, 0xFFFFFFE4, virt_to_phys(buffer_rdv));
+#endif
+
 	__cortex_a9_save(mode);
 	/* return from __cortex_a9_restore */
 	barrier();
@@ -462,6 +489,10 @@ static void tegra_suspend_dram(bool do_lp0)
 	l2x0_shutdown();
 #endif
 
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+// TRUSTED LOGIC SMC_STOP/Save State
+	callGenericSMC(0xFFFFFFFC, 0xFFFFFFE3, virt_to_phys(buffer_rdv));
+#endif
 	__cortex_a9_save(mode);
 	restore_cpu_complex();
 

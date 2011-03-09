@@ -406,7 +406,10 @@ ENTRY(__cortex_a9_restore)
 	mcr	p15, 2, r0, c0, c0, 0	@ csselr
 	mcr	p15, 0, r1, c1, c0, 0	@ sctlr
 	mcr	p15, 0, r2, c1, c0, 1	@ actlr
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
+	//TL : moved to secure 
 	mcr	p15, 0, r3, c15, c0, 0	@ pctlr
+#endif
 
 	add	r9, r8, #CTX_TTBR0
 	ldmia	r9!, {r0-r7}
@@ -510,8 +513,11 @@ ENTRY(__cortex_a9_restore)
 #endif
 	mcr	p15, 0, lr, c1, c0, 2	@ cpacr (loaded before VFP)
 
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
+	//TL : moved to secure 
 	ldr	r9, [r8, #CTX_DIAGNOSTIC]
 	mcr	p15, 0, r9, c15, c0, 1	@ diag
+#endif
 
 	/* finally, restore the stack and return */
 	ldmfd	sp!, {r3-r12, lr}
@@ -532,6 +538,7 @@ ENTRY(__cortex_a9_l2x0_restart)
 	mov32	r9, (TEGRA_ARM_PL310_BASE-IO_CPU_PHYS+IO_CPU_VIRT)
 	add	r10, r8, #CTX_L2_CTRL
 	ldmia	r10, {r3-r7}
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
 	str	r5, [r9, #L2X0_TAG_LATENCY_CTRL]
 	str	r6, [r9, #L2X0_DATA_LATENCY_CTRL]
 	str	r7, [r9, #L2X0_PREFETCH_OFFSET]
@@ -557,6 +564,21 @@ __reenable_l2x0:
 	dsb
 	isb
 	str	r3, [r9, #L2X0_CTRL]
+#else
+	cmp r3, #0        @ only call SMC if L2 was enable
+	beq l2_done
+	
+	cmp	r0, #0      @ if invalidate, call SMC with R1=1, else R1=4
+	moveq r1, #4
+	movne r1, #1
+// SMC(Enable Cache)
+	ldr r0, =0xFFFFF100
+	ldr r2, =0x00000000
+	ldr r3, =0x00000000
+	ldr r4, =0x00000000
+	smc 0
+l2_done:
+#endif
 #endif
 	b	__cortex_a9_restore
 

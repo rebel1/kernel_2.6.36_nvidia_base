@@ -98,9 +98,21 @@ void __init tegra_init_cache(void)
 #ifdef CONFIG_CACHE_L2X0
 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
 
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
+   /*
+   ISSUE : Some registers of PL310 controler must be called from Secure context!
+            When called form Normal we obtain an abort.
+            Instructions that must be called in Secure :
+               - Tag and Data RAM Latency Control Registers (0x108 & 0x10C) must be written in Secure.
+        
+   The following section of code has been regrouped in the implementation of "l2x0_init".
+   The "l2x0_init" will in fact call an SMC intruction to switch from Normal context to Secure context.
+   The configuration and activation will be done in Secure.
+   */
 	writel(0x331, p + L2X0_TAG_LATENCY_CTRL);
 	writel(0x441, p + L2X0_DATA_LATENCY_CTRL);
 	writel(2, p + L2X0_PWR_CTRL);
+#endif
 
 	l2x0_init(p, 0x6C480001, 0x8200c3fe);
 #endif

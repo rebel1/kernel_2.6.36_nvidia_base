@@ -23,6 +23,11 @@
 #include <asm/cacheflush.h>
 #include <asm/hardware/cache-l2x0.h>
 
+#ifdef CONFIG_TRUSTED_FOUNDATIONS
+#include <linux/sched.h>
+void callGenericSMC(u32 param0, u32 param1, u32 param2);
+#endif
+
 #define CACHE_LINE_SIZE		32
 
 static void __iomem *l2x0_base;
@@ -249,6 +254,11 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
 void l2x0_shutdown(void)
 {
 	unsigned long flags;
+#ifdef CONFIG_SMP
+	long ret;
+	cpumask_t saved_cpu_mask;
+	cpumask_t local_cpu_mask = CPU_MASK_NONE;
+#endif
 
 	if (l2x0_disabled)
 		return;
@@ -258,6 +268,7 @@ void l2x0_shutdown(void)
 	local_irq_save(flags);
 
 	if (readl(l2x0_base + L2X0_CTRL) & 1) {
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
 		int m;
 		/* lockdown all ways, all masters to prevent new line
 		 * allocation during maintenance */
@@ -274,6 +285,27 @@ void l2x0_shutdown(void)
 			writel(0, l2x0_base + L2X0_LOCKDOWN_WAY_D + (m*8));
 			writel(0, l2x0_base + L2X0_LOCKDOWN_WAY_I + (m*8));
 		}
+#else
+#ifdef CONFIG_SMP
+      /* If SMP defined, 
+         TF is running on Core #0. So, force execution on Core #0 */
+		cpu_set(0, local_cpu_mask);
+		sched_getaffinity(0, &saved_cpu_mask);
+		ret = sched_setaffinity(0, &local_cpu_mask);
+		if (ret != 0)
+		{
+			printk(KERN_ERR "sched_setaffinity #1 -> 0x%lX", ret);
+		}
+#endif
+		callGenericSMC(0xFFFFF100, 0x00000002, 0);
+#ifdef CONFIG_SMP
+		ret = sched_setaffinity(0, &saved_cpu_mask);
+		if (ret != 0)
+		{
+			printk(KERN_ERR "sched_setaffinity #2 -> 0x%lX", ret);
+		}
+#endif
+#endif
 	}
 
 	local_irq_restore(flags);
@@ -285,6 +317,11 @@ static void l2x0_enable(__u32 aux_val, __u32 aux_mask)
 	__u32 cache_id;
 	int ways;
 	const char *type;
+#ifdef CONFIG_SMP
+	long ret;
+	cpumask_t saved_cpu_mask;
+	cpumask_t local_cpu_mask = CPU_MASK_NONE;
+#endif
 
 	if (l2x0_disabled)
 		return;
@@ -324,6 +361,7 @@ static void l2x0_enable(__u32 aux_val, __u32 aux_mask)
 	 */
 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
 
+#ifndef CONFIG_TRUSTED_FOUNDATIONS
 		/* l2x0 controller is disabled */
 		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
 
@@ -331,6 +369,41 @@ static void l2x0_enable(__u32 aux_val, __u32 aux_mask)
 
 		/* enable L2X0 */
 		writel_relaxed(1, l2x0_base + L2X0_CTRL);
+      
+#else /* CONFIG_TRUSTED_FOUNDATIONS is defined */
+/*
+			ISSUE : Some registers of PL310 controler must be written from Secure context!
+						When called form Normal we obtain an abort or do nothing.
+						Instructions that must be called in Secure :
+						- Write to Control register (L2X0_CTRL==0x100)
+						- Write in Auxiliary controler (L2X0_AUX_CTRL==0x104)
+						- Invalidate all entries in cache (L2X0_INV_WAY==0x77C), mandatory at boot time.
+						- Tag and Data RAM Latency Control Registers (0x108 & 0x10C) must be written in Secure.
+
+			The following call are now called by a Secure driver.
+			We switch to Secure context and ask to Trusted Foundations to do the configuration and activation of L2.*/
+		/* l2x0 controller is disabled */
+
+#ifdef CONFIG_SMP
+      /* If SMP defined, 
+         TF is running on Core #0. So, force execution on Core #0 */
+		cpu_set(0, local_cpu_mask);
+		sched_getaffinity(0, &saved_cpu_mask);
+		ret = sched_setaffinity(0, &local_cpu_mask);
+		if (ret != 0)
+		{
+			printk(KERN_ERR "sched_setaffinity #1 -> 0x%lX", ret);
+		}
+#endif
+		callGenericSMC(0xFFFFF100, 0x00000001, 0);
+#ifdef CONFIG_SMP
+		ret = sched_setaffinity(0, &saved_cpu_mask);
+		if (ret != 0)
+		{
+			printk(KERN_ERR "sched_setaffinity #2 -> 0x%lX", ret);
+		}
+#endif
+#endif
 	}
 
 	/*printk(KERN_INFO "%s cache controller enabled\n", type);
