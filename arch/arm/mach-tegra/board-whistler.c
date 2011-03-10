@@ -34,6 +34,7 @@
 #include <linux/gpio_scrollwheel.h>
 #include <linux/input.h>
 #include <linux/platform_data/tegra_usb.h>
+#include <linux/mfd/max8907c.h>
 #include <linux/usb/android_composite.h>
 #include <linux/memblock.h>
 
@@ -510,6 +511,22 @@ static int __init whistler_gps_init(void)
 	return 0;
 }
 
+static void whistler_power_off(void)
+{
+	int ret;
+
+	ret = max8907c_power_off();
+	if (ret)
+		pr_err("whistler: failed to power off\n");
+
+	while (1);
+}
+
+static void __init whistler_power_off_init(void)
+{
+	pm_power_off = whistler_power_off;
+}
+
 static const struct i2c_board_info whistler_codec_info[] = {
 	{
 		I2C_BOARD_INFO("wm8753", 0x1a),
@@ -547,6 +564,7 @@ static void __init tegra_whistler_init(void)
 	whistler_usb_init();
 	whistler_scroll_init();
 	whistler_codec_init();
+	whistler_power_off_init();
 }
 
 int __init tegra_whistler_protected_aperture_init(void)
