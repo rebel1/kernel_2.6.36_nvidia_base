@@ -207,18 +207,9 @@ static int tegra_wired_jack_probe(struct platform_device *pdev)
 	tegra_wired_jack_conf.cdc_irq = cdc_irq;
 	tegra_wired_jack_conf.en_spkr = en_spkr;
 
-	/* Addd h2w swith class support */
-	ret = switch_dev_register(&wired_switch_dev);
-	if (ret < 0)
-		goto switch_dev_failed;
-
 	snd_soc_jack_notifier_register(tegra_wired_jack,
 				       &wired_switch_nb);
 
-	return 0;
-
-switch_dev_failed:
-	switch_dev_unregister(&wired_switch_dev);
 	return ret;
 }
 
@@ -231,8 +222,6 @@ static int tegra_wired_jack_remove(struct platform_device *pdev)
 	gpio_free(tegra_wired_jack_conf.en_mic_int);
 	gpio_free(tegra_wired_jack_conf.en_mic_ext);
 	gpio_free(tegra_wired_jack_conf.en_spkr);
-
-	switch_dev_unregister(&wired_switch_dev);
 
 	return 0;
 }
@@ -272,12 +261,19 @@ int tegra_jack_init(struct snd_soc_codec *codec)
 	if (ret < 0)
 		goto failed;
 
+	/* Addd h2w swith class support */
+	ret = switch_dev_register(&wired_switch_dev);
+	if (ret < 0)
+		goto switch_dev_failed;
+
 	ret = platform_driver_register(&tegra_wired_jack_driver);
 	if (ret < 0)
 		goto platform_dev_failed;
 
 	return 0;
 
+switch_dev_failed:
+	switch_dev_unregister(&wired_switch_dev);
 platform_dev_failed:
 	platform_driver_unregister(&tegra_wired_jack_driver);
 failed:
@@ -290,6 +286,7 @@ failed:
 
 void tegra_jack_exit(void)
 {
+	switch_dev_unregister(&wired_switch_dev);
 	platform_driver_unregister(&tegra_wired_jack_driver);
 
 	if (tegra_wired_jack) {
