@@ -320,6 +320,7 @@ static int tegra_sdhci_resume(struct platform_device *pdev)
 {
 	struct tegra_sdhci_host *host = platform_get_drvdata(pdev);
 	int ret;
+	u8 pwr;
 
 	if (host->card_always_on && is_card_sdio(host->sdhci->mmc->card)) {
 		int ret = 0;
@@ -342,6 +343,11 @@ static int tegra_sdhci_resume(struct platform_device *pdev)
 	}
 
 	tegra_sdhci_enable_clock(host, 1);
+
+	pwr = SDHCI_POWER_ON;
+	sdhci_writeb(host->sdhci, pwr, SDHCI_POWER_CONTROL);
+	host->sdhci->pwr = 0;
+
 	ret = sdhci_resume_host(host->sdhci);
 	if (ret)
 		pr_err("%s: failed, error = %d\n", __func__, ret);
