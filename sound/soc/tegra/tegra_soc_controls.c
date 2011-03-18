@@ -208,9 +208,11 @@ static const struct snd_soc_dapm_route audio_map[] = {
 
 	/* headset Jack  - in = micin, out = LHPOUT*/
 	{"Headset Jack", NULL, "HPOUTL"},
+	{"Headset Jack", NULL, "HPOUTR"},
 
 	/* headphone connected to LHPOUT1, RHPOUT1 */
-	{"Headphone Jack", NULL, "HPOUTR"}, {"Headphone Jack", NULL, "HPOUTL"},
+	{"Headphone Jack", NULL, "HPOUTR"},
+	{"Headphone Jack", NULL, "HPOUTL"},
 
 	/* build-in speaker connected to LON/P RON/P */
 	{"Int Spk", NULL, "RON"},
