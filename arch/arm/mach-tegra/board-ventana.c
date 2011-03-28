@@ -580,7 +580,6 @@ static struct platform_device tegra_camera = {
 static struct platform_device *ventana_devices[] __initdata = {
 	&tegra_usb_fsg_device,
 	&androidusb_device,
-	&debug_uart,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
 	&pmu_device,
@@ -837,6 +836,10 @@ static void __init tegra_ventana_init(void)
 	tegra_i2s_device1.dev.platform_data = &tegra_audio_pdata[0];
 	tegra_i2s_device2.dev.platform_data = &tegra_audio_pdata[1];
 	tegra_spdif_device.dev.platform_data = &tegra_spdif_pdata;
+	if (is_tegra_debug_uartport_hs() == true)
+		platform_device_register(&tegra_uartd_device);
+	else
+		platform_device_register(&debug_uart);
 	tegra_das_device.dev.platform_data = &tegra_das_pdata;
 	tegra_ehci2_device.dev.platform_data
 		= &ventana_ehci2_ulpi_platform_data;
