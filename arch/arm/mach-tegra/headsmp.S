@@ -46,6 +46,7 @@
  *	 Initial secondary processor boot vector; jumps to kernel's
  *	 secondary_startup routine
  */
+#ifdef CONFIG_SMP
 ENTRY(tegra_secondary_startup)
 	msr	cpsr_fsxc, #0xd3
 	bl	__invalidate_cpu_state
@@ -54,6 +55,7 @@ ENTRY(tegra_secondary_startup)
 	poke_ev	r0, r1
 	b	secondary_startup
 ENDPROC(tegra_secondary_startup)
+#endif
 
 /*
  *	__enable_coresite_access
