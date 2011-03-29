@@ -3,7 +3,7 @@
  *
  * Declarations of Tegra Digital Audio Switch (das)
  *
- * Copyright (c) 2010, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -120,44 +120,22 @@ enum tegra_das_port_con_id {
 	tegra_das_port_con_id_max
 };
 
-/* possible list of input/output devices */
-#define audio_dev_none			(0x0)
-#define audio_dev_all			(0xffffffff)
-
-/* Inputs */
-#define audio_dev_builtin_mic		(0x1)
-#define audio_dev_mic			(0x2)
-#define audio_dev_lineIn		(0x4)
-
-/* Outputs */
-#define audio_dev_speaker		(0x100)
-#define audio_dev_earpiece		(0x200)
-#define audio_dev_lineout		(0x400)
-#define audio_dev_headphone		(0x800)
-#define audio_dev_bt_a2dp		(0x1000)
-
-/* Both */
-#define audio_dev_aux			(0x10000)
-#define audio_dev_headset		(0x20000)
-#define audio_dev_radio			(0x40000)
-#define audio_dev_bt_sco		(0x80000)
-
 /* data format supported */
 enum dac_dap_data_format {
+	dac_dap_data_format_none = 0x0,
 	dac_dap_data_format_i2s = 0x1,
-	dac_dap_data_format_rjm,
-	dac_dap_data_format_ljm,
-	dac_dap_data_format_dsp,
-	dac_dap_data_format_pcm,
-	dac_dap_data_format_nw,
-	dac_dap_data_format_tdm,
+	dac_dap_data_format_dsp = 0x2,
+	dac_dap_data_format_rjm = 0x4,
+	dac_dap_data_format_ljm = 0x8,
+
+	dac_dap_data_format_all = 0x7FFFFFFF
 };
 
 struct audio_dev_property {
 	unsigned int num_channels;
 	unsigned int bits_per_sample;
 	unsigned int rate;
-	enum dac_dap_data_format  dac_dap_data_comm_format;
+	unsigned int dac_dap_data_comm_format;
 };
 
 /*
@@ -167,6 +145,7 @@ struct audio_dev_property {
  */
 struct tegra_dap_property {
 	tegra_das_port dac_port;
+	tegra_das_port dap_port;
 	enum  tegra_audio_codec_type codec_type;
 	struct audio_dev_property device_property;
 };
@@ -231,6 +210,22 @@ int tegra_das_set_connection(enum tegra_das_port_con_id new_con_id);
  * Function to get current port connection for das
  */
 int tegra_das_get_connection(void);
+
+/*
+ * Function to query if certain das port need to be
+ * configured as master for current das connection
+ */
+bool tegra_das_is_port_master(enum tegra_audio_codec_type codec_type);
+
+/*
+ * Function to get data format for certain codec for current das connection
+ */
+int tegra_das_get_codec_data_fmt(enum tegra_audio_codec_type codec_type);
+
+/*
+ * Function to get dap Mclk handle
+ */
+struct clk* tegra_das_get_dap_mclk(void);
 
 /*
  * Function to set power state on das's dap port
