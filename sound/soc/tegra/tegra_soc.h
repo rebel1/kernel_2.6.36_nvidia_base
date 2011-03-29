@@ -1,7 +1,7 @@
 /*
  * tegra_soc.h  --  SoC audio for tegra
  *
- * (c) 2010 Nvidia Graphics Pvt. Ltd.
+ * (c) 2010-2011 Nvidia Graphics Pvt. Ltd.
  *  http://www.nvidia.com
  *
  * Copyright 2007 Wolfson Microelectronics PLC.
@@ -80,6 +80,16 @@
 #define DMA_STEP_SIZE_MIN 8
 #define DMA_REQ_QCOUNT 2
 
+#define TEGRA_AUDIO_OFF		0x0
+#define TEGRA_HEADPHONE		0x1
+#define TEGRA_LINEOUT		0x2
+#define TEGRA_SPK		0x4
+#define TEGRA_EAR_SPK		0x8
+#define TEGRA_INT_MIC		0x10
+#define TEGRA_EXT_MIC		0x20
+#define TEGRA_LINEIN		0x40
+#define TEGRA_HEADSET		0x80
+
 struct tegra_dma_channel;
 
 struct tegra_runtime_data {
@@ -97,9 +107,14 @@ struct tegra_runtime_data {
 
 struct tegra_audio_data {
 	struct snd_soc_codec *codec;
+	struct clk *dap_mclk;
+	bool init_done;
+
 	int play_device;
 	int capture_device;
 	bool is_call_mode;
+
+	int codec_con;
 };
 
 struct wired_jack_conf {
@@ -113,8 +128,8 @@ struct wired_jack_conf {
 	int amp_reg_enabled;
 };
 
+void tegra_ext_control(struct snd_soc_codec *codec, int new_con);
 int tegra_controls_init(struct snd_soc_codec *codec);
-void tegra_controls_exit(void);
 
 int tegra_jack_init(struct snd_soc_codec *codec);
 void tegra_jack_exit(void);

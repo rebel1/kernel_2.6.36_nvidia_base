@@ -1,7 +1,7 @@
 /*
  * tegra_pcm.c  --  ALSA Soc Audio Layer
  *
- * (c) 2010 Nvidia Graphics Pvt. Ltd.
+ * (c) 2010-2011 Nvidia Graphics Pvt. Ltd.
  *  http://www.nvidia.com
  *
  * (c) 2006 Wolfson Microelectronics PLC.
@@ -146,14 +146,14 @@ static int tegra_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			prtd->state = STATE_INIT;
 			prtd->dma_state = STATE_INIT;
-			tegra_pcm_play(prtd); /* dma enqueue req1 */
-			tegra_pcm_play(prtd); /* dma enqueue req2 */
+			for (i = 0; i < DMA_REQ_QCOUNT; i++)
+				tegra_pcm_play(prtd); /* dma enqueue req */
 		} else if (prtd->state != STATE_INIT) {
 			/* start recording */
 			prtd->state = STATE_INIT;
 			prtd->dma_state = STATE_INIT;
-			tegra_pcm_capture(prtd); /* dma enqueue req1 */
-			tegra_pcm_capture(prtd); /* dma enqueue req2 */
+			for (i = 0; i < DMA_REQ_QCOUNT; i++)
+				tegra_pcm_capture(prtd); /* dma enqueue req */
 		}
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:

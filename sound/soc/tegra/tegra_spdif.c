@@ -1,7 +1,7 @@
 /*
  * tegra_spdif.c  --  ALSA Soc Audio Layer
  *
- * Copyright (c) 2011, NVIDIA Corporation.
+ * Copyright (c) 2010-2011, NVIDIA Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -109,22 +109,24 @@ static int tegra_spdif_hw_params(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct tegra_spdif_info *info = dai->private_data;
-	int ret = 0;
 	int val;
+	unsigned int rate, sample_size;
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		val = SPDIF_BIT_MODE_MODE16BIT;
+		sample_size = 16;
 		break;
 	case SNDRV_PCM_FORMAT_S24_LE:
 		val = SPDIF_BIT_MODE_MODE24BIT;
+		sample_size = 16;
 		break;
 	case SNDRV_PCM_FORMAT_S32_LE:
 		val = SPDIF_BIT_MODE_MODERAW;
+		sample_size = 32;
 		break;
 	default:
-		ret =-EINVAL;
-		goto err;
+		return -EINVAL;
 	}
 
 	spdif_set_bit_mode(info->spdif_base, val);
@@ -140,15 +142,20 @@ static int tegra_spdif_hw_params(struct snd_pcm_substream *substream,
 		val = params_rate(params);
 		break;
 	default:
-		ret = -EINVAL;
-		goto err;
+		return -EINVAL;
 	}
 
-	spdif_set_sample_rate(info->spdif_base, val);
-	return 0;
+	/* Min BCLK = samplerate * channel * bits per sample * 4 */
+	rate = val * params_channels(params) * sample_size * 4;
 
-err:
-	return ret;
+	/* Ensure Spdif clk rate is atleast greater than min BCLK */
+	clk_set_rate(info->spdif_clk, rate);
+	if (clk_get_rate(info->spdif_clk) < rate)
+		clk_set_rate(info->spdif_clk, rate << 1);
+
+	spdif_set_sample_rate(info->spdif_base, val);
+
+	return 0;
 }
 
 
@@ -161,17 +168,6 @@ static int tegra_spdif_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 static int tegra_spdif_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
 					int clk_id, unsigned int freq, int dir)
 {
-	struct tegra_spdif_info* info = cpu_dai->private_data;
-	struct tegra_audio_platform_data *pdata = info->pdev->dev.platform_data;
-
-	if (info && info->spdif_clk) {
-		clk_set_rate(info->spdif_clk, pdata->spdif_clk_rate);
-	}
-	else {
-		pr_err("%s: could not get spdif clock\n", __func__);
-		return -EIO;
-	}
-
 	return 0;
 }
 
@@ -349,6 +345,7 @@ static int tegra_spdif_driver_probe(struct platform_device *pdev)
 		err = PTR_ERR(info->spdif_clk);
 		goto fail_unmap_mem;
 	}
+	clk_enable(info->spdif_clk);
 	clk_set_rate(info->spdif_clk, info->pdata->spdif_clk_rate);
 
 	spdif_initialize(info->spdif_base, AUDIO_TX_MODE);
@@ -360,6 +357,8 @@ static int tegra_spdif_driver_probe(struct platform_device *pdev)
 	if (err)
 		goto fail_unmap_mem;
 
+	/* Disable SPDIF clock to save power */
+	clk_disable(info->spdif_clk);
 	return 0;
 
 fail_unmap_mem:

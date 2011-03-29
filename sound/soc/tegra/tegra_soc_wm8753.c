@@ -1,7 +1,7 @@
  /*
   * tegra_soc_wm8753.c  --  SoC audio for tegra
   *
-  * Copyright  2011 Nvidia Graphics Pvt. Ltd.
+  * Copyright  2010-2011 Nvidia Graphics Pvt. Ltd.
   *
   * Author: Sachin Nikam
   *             snikam@nvidia.com
@@ -26,6 +26,7 @@
 
 #include "tegra_soc.h"
 #include "../codecs/wm8753.h"
+#include <sound/soc-dapm.h>
 #include <linux/regulator/consumer.h>
 
 #include <linux/types.h>
@@ -142,6 +143,7 @@ static struct platform_device *tegra_snd_device;
 static struct regulator* wm8753_reg;
 
 extern struct snd_soc_dai tegra_i2s_dai[];
+extern struct snd_soc_dai tegra_spdif_dai;
 extern struct snd_soc_dai tegra_generic_codec_dai[];
 extern struct snd_soc_platform tegra_soc_platform;
 
@@ -151,61 +153,49 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
 	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
-	int err;
-	unsigned int value;
-	unsigned int channels, rate, bit_size = 16;
 	struct snd_soc_codec *codec = codec_dai->codec;
+	struct tegra_audio_data* audio_data = rtd->socdev->codec_data;
+	enum dac_dap_data_format data_fmt;
+	int dai_flag = 0, sys_clk;
+	unsigned int value;
+	int err;
 
-	rate	 = params_rate(params);		/* Sampling Rate in Hz */
-	channels = params_channels(params);	/* Number of channels */
+	if (tegra_das_is_port_master(tegra_audio_codec_type_hifi))
+		dai_flag |= SND_SOC_DAIFMT_CBM_CFM;
+	else
+		dai_flag |= SND_SOC_DAIFMT_CBS_CFS;
 
-	switch (params_format(params)) {
-	case SNDRV_PCM_FORMAT_S16_LE:
-		bit_size = 16;
-		break;
-	case SNDRV_PCM_FORMAT_S20_3LE:
-		bit_size = 20;
-		break;
-	case SNDRV_PCM_FORMAT_S24_LE:
-		bit_size = 24;
-		break;
-	case SNDRV_PCM_FORMAT_S32_LE:
-		bit_size = 32;
-		break;
-	default:
-		pr_err(KERN_ERR "Invalid pcm format size\n");
-		return EINVAL;
-	}
+	data_fmt = tegra_das_get_codec_data_fmt(tegra_audio_codec_type_hifi);
 
-	err = snd_soc_dai_set_fmt(codec_dai,
-			SND_SOC_DAIFMT_I2S |
-			SND_SOC_DAIFMT_NB_NF |
-			SND_SOC_DAIFMT_CBS_CFS);
+	/* We are supporting DSP and I2s format for now */
+	if (data_fmt & dac_dap_data_format_i2s)
+		dai_flag |= SND_SOC_DAIFMT_I2S;
+	else
+		dai_flag |= SND_SOC_DAIFMT_DSP_A;
+
+	err = snd_soc_dai_set_fmt(codec_dai, dai_flag);
 	if (err < 0) {
-		pr_err(KERN_ERR "codec_dai fmt not set\n");
+		pr_err("codec_dai fmt not set \n");
 		return err;
 	}
 
-	err = snd_soc_dai_set_fmt(cpu_dai,
-			SND_SOC_DAIFMT_I2S |
-			SND_SOC_DAIFMT_NB_NF |
-			SND_SOC_DAIFMT_CBS_CFS);
+
+	err = snd_soc_dai_set_fmt(cpu_dai, dai_flag);
 	if (err < 0) {
-		pr_err(KERN_ERR "cpu_dai fmt not set\n");
+		pr_err("cpu_dai fmt not set \n");
 		return err;
 	}
 
-	err = snd_soc_dai_set_sysclk(codec_dai, 0, bit_size*rate*channels*2*4,
-			SND_SOC_CLOCK_IN);
+	sys_clk = clk_get_rate(audio_data->dap_mclk);
+	err = snd_soc_dai_set_sysclk(codec_dai, 0, sys_clk, SND_SOC_CLOCK_IN);
 	if (err < 0) {
-		pr_err(KERN_ERR "codec_dai clock not set\n");
+		pr_err("codec_dai clock not set\n");
 		return err;
 	}
 
-	err = snd_soc_dai_set_sysclk(cpu_dai, 0, bit_size*rate*channels*2,
-			SND_SOC_CLOCK_IN);
+	err = snd_soc_dai_set_sysclk(cpu_dai, 0, sys_clk, SND_SOC_CLOCK_IN);
 	if (err < 0) {
-		pr_err(KERN_ERR "cpu_dai clock not set\n");
+		pr_err("cpu_dai clock not set\n");
 		return err;
 	}
 
@@ -326,24 +316,49 @@ static int tegra_voice_hw_params(struct snd_pcm_substream *substream,
 
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
 	struct snd_soc_dai *cpu_dai = rtd->dai->cpu_dai;
+	struct tegra_audio_data* audio_data = rtd->socdev->codec_data;
+	enum dac_dap_data_format data_fmt;
+	int dai_flag = 0, sys_clk;
 	int err;
 
-	err = snd_soc_dai_set_fmt(cpu_dai,
-					   SND_SOC_DAIFMT_DSP_A | \
-					   SND_SOC_DAIFMT_NB_NF | \
-					   SND_SOC_DAIFMT_CBS_CFS);
+	if (tegra_das_is_port_master(tegra_audio_codec_type_bluetooth))
+		dai_flag |= SND_SOC_DAIFMT_CBM_CFM;
+	else
+		dai_flag |= SND_SOC_DAIFMT_CBS_CFS;
 
+	data_fmt = tegra_das_get_codec_data_fmt(tegra_audio_codec_type_bluetooth);
+
+	/* We are supporting DSP and I2s format for now */
+	if (data_fmt & dac_dap_data_format_dsp)
+		dai_flag |= SND_SOC_DAIFMT_DSP_A;
+	else
+		dai_flag |= SND_SOC_DAIFMT_I2S;
+
+	err = snd_soc_dai_set_fmt(codec_dai, dai_flag);
 	if (err < 0) {
-		  pr_err("%s:cpu_dai fmt not set \n", __func__);
-		  return err;
+		pr_err("codec_dai fmt not set \n");
+		return err;
 	}
 
-	err = snd_soc_dai_set_sysclk(cpu_dai, 0, I2S2_CLK, SND_SOC_CLOCK_IN);
-
+	err = snd_soc_dai_set_fmt(cpu_dai, dai_flag);
 	if (err < 0) {
-		  pr_err("%s:cpu_dai clock not set\n", __func__);
-		  return err;
+		pr_err("cpu_dai fmt not set \n");
+		return err;
+	}
+
+	sys_clk = clk_get_rate(audio_data->dap_mclk);
+	err = snd_soc_dai_set_sysclk(codec_dai, 0, sys_clk, SND_SOC_CLOCK_IN);
+	if (err < 0) {
+		pr_err("cpu_dai clock not set\n");
+		return err;
+	}
+
+	err = snd_soc_dai_set_sysclk(cpu_dai, 0, sys_clk, SND_SOC_CLOCK_IN);
+	if (err < 0) {
+		pr_err("cpu_dai clock not set\n");
+		return err;
 	}
 
 	return 0;
@@ -354,14 +369,161 @@ static int tegra_voice_hw_free(struct snd_pcm_substream *substream)
 	return 0;
 }
 
+static int tegra_spdif_hw_params(struct snd_pcm_substream *substream,
+					struct snd_pcm_hw_params *params)
+{
+	return 0;
+}
+
+int tegra_codec_startup(struct snd_pcm_substream *substream)
+{
+	tegra_das_power_mode(true);
+
+	return 0;
+}
+
+void tegra_codec_shutdown(struct snd_pcm_substream *substream)
+{
+	tegra_das_power_mode(false);
+}
+
+int tegra_soc_suspend_pre(struct platform_device *pdev, pm_message_t state)
+{
+	return 0;
+}
+
+int tegra_soc_suspend_post(struct platform_device *pdev, pm_message_t state)
+{
+	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
+	struct tegra_audio_data* audio_data = socdev->codec_data;
+
+	clk_disable(audio_data->dap_mclk);
+
+	return 0;
+}
+
+int tegra_soc_resume_pre(struct platform_device *pdev)
+{
+	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
+	struct tegra_audio_data* audio_data = socdev->codec_data;
+
+	clk_enable(audio_data->dap_mclk);
+
+	return 0;
+}
+
+int tegra_soc_resume_post(struct platform_device *pdev)
+{
+	return 0;
+}
+
 static struct snd_soc_ops tegra_hifi_ops = {
 	.hw_params = tegra_hifi_hw_params,
 	.hw_free   = tegra_hifi_hw_free,
+	.startup = tegra_codec_startup,
+	.shutdown = tegra_codec_shutdown,
 };
 
 static struct snd_soc_ops tegra_voice_ops = {
 	.hw_params = tegra_voice_hw_params,
 	.hw_free   = tegra_voice_hw_free,
+	.startup = tegra_codec_startup,
+	.shutdown = tegra_codec_shutdown,
+};
+
+static struct snd_soc_ops tegra_spdif_ops = {
+	.hw_params = tegra_spdif_hw_params,
+};
+
+void tegra_ext_control(struct snd_soc_codec *codec, int new_con)
+{
+	struct tegra_audio_data* audio_data = codec->socdev->codec_data;
+
+	/* Disconnect old codec routes and connect new routes*/
+	if (new_con & TEGRA_HEADPHONE)
+		snd_soc_dapm_enable_pin(codec, "Headphone");
+	else
+		snd_soc_dapm_disable_pin(codec, "Headphone");
+
+	if (new_con & TEGRA_EAR_SPK)
+		snd_soc_dapm_enable_pin(codec, "EarPiece");
+	else
+		snd_soc_dapm_disable_pin(codec, "EarPiece");
+
+	if (new_con & TEGRA_SPK)
+		snd_soc_dapm_enable_pin(codec, "Int Spk");
+	else
+		snd_soc_dapm_disable_pin(codec, "Int Spk");
+
+	if (new_con & TEGRA_INT_MIC)
+		snd_soc_dapm_enable_pin(codec, "Int Mic");
+	else
+		snd_soc_dapm_disable_pin(codec, "Int Mic");
+
+	if (new_con & TEGRA_EXT_MIC)
+		snd_soc_dapm_enable_pin(codec, "Ext Mic");
+	else
+		snd_soc_dapm_disable_pin(codec, "Ext Mic");
+
+	if (new_con & TEGRA_LINEIN)
+		snd_soc_dapm_enable_pin(codec, "Linein");
+	else
+		snd_soc_dapm_disable_pin(codec, "Linein");
+
+	if (new_con & TEGRA_HEADSET)
+		snd_soc_dapm_enable_pin(codec, "Headset");
+	else
+		snd_soc_dapm_disable_pin(codec, "Headset");
+
+	/* signal a DAPM event */
+	snd_soc_dapm_sync(codec);
+	audio_data->codec_con = new_con;
+}
+
+/*tegra machine dapm widgets */
+static const struct snd_soc_dapm_widget tegra_dapm_widgets[] = {
+	SND_SOC_DAPM_HP("Headphone", NULL),
+	SND_SOC_DAPM_HP("EarPiece", NULL),
+	SND_SOC_DAPM_HP("Headset", NULL),
+	SND_SOC_DAPM_SPK("Int Spk", NULL),
+	SND_SOC_DAPM_MIC("Ext Mic", NULL),
+	SND_SOC_DAPM_MIC("Int Mic", NULL),
+	SND_SOC_DAPM_LINE("Linein", NULL),
+};
+
+/* Tegra machine audio map (connections to the codec pins) */
+static const struct snd_soc_dapm_route audio_map[] = {
+
+	/* headphone connected to LHPOUT1, RHPOUT1 */
+	{"Headphone", NULL, "ROUT1"},
+	{"Headphone", NULL, "LOUT1"},
+
+	/* earpiece */
+	{"EarPiece", NULL, "ROUT2"},
+	{"EarPiece", NULL, "LOUT2"},
+
+	/* headset Jack */
+	{"Headset", NULL, "ROUT1"},
+	{"Headset", NULL, "LOUT1"},
+	{"MIC1", NULL, "Mic Bias"},
+	{"Mic Bias", NULL, "Headset"},
+
+	/* build-in speaker */
+	{"Int Spk", NULL, "ROUT1"},
+	{"Int Spk", NULL, "LOUT1"},
+
+	/* internal mic is mono */
+	{"MIC1", NULL, "Mic Bias"},
+	{"Mic Bias", NULL, "Int Mic"},
+
+	/* external mic is stero */
+	{"MIC2", NULL, "Mic Bias"},
+	{"MIC2N", NULL, "Mic Bias"},
+	{"Mic Bias", NULL, "Ext Mic"},
+
+	/* Line in */
+	{"LINE1", NULL, "Linein"},
+	{"LINE2", NULL, "Linein"},
 };
 
 static void wm8753_intr_work(struct work_struct *work)
@@ -413,73 +575,106 @@ static irqreturn_t wm8753_irq(int irq, void *data)
 
 static int tegra_codec_init(struct snd_soc_codec *codec)
 {
-	int ret;
+	struct tegra_audio_data* audio_data = codec->socdev->codec_data;
+	int ret = 0;
 	unsigned int value;
 
-	ret =  tegra_controls_init(codec);
-	if (ret < 0)
-		goto failed;
+	if (!audio_data->init_done) {
+		audio_data->dap_mclk = tegra_das_get_dap_mclk();
+		if (!audio_data->dap_mclk) {
+			pr_err("Failed to get dap mclk \n");
+			ret = -ENODEV;
+			return ret;
+		}
+		clk_enable(audio_data->dap_mclk);
 
-	if (!wm8753_jack) {
+		/* Add tegra specific widgets */
+		snd_soc_dapm_new_controls(codec, tegra_dapm_widgets,
+					ARRAY_SIZE(tegra_dapm_widgets));
 
-		wm8753_jack = kzalloc(sizeof(*wm8753_jack), GFP_KERNEL);
-		if (!wm8753_jack) {
-			pr_err("failed to allocate wm8753-jack\n");
-			return -ENOMEM;
+		/* Set up tegra specific audio path audio_map */
+		snd_soc_dapm_add_routes(codec, audio_map,
+					ARRAY_SIZE(audio_map));
+
+		/* Add jack detection */
+		ret = tegra_jack_init(codec);
+		if (ret < 0) {
+			pr_err("Failed in jack init \n");
+			return ret;
 		}
 
-		wm8753_jack->gpio = TEGRA_GPIO_PW3;
-		wm8753_jack->pcodec = codec;
+		/* Default to OFF */
+		tegra_ext_control(codec, TEGRA_AUDIO_OFF);
 
-		INIT_WORK(&wm8753_jack->work, wm8753_intr_work);
+		ret = tegra_controls_init(codec);
+		if (ret < 0) {
+			pr_err("Failed in controls init \n");
+			return ret;
+		}
 
-		ret = snd_jack_new(codec->card, "Headphone Jack", SND_JACK_HEADPHONE,
-			&wm8753_jack->jack);
-		if (ret < 0)
-			goto failed;
+		if (!wm8753_jack) {
+			wm8753_jack = kzalloc(sizeof(*wm8753_jack), GFP_KERNEL);
+			if (!wm8753_jack) {
+				pr_err("failed to allocate wm8753-jack\n");
+				return -ENOMEM;
+			}
 
-		ret = gpio_request(wm8753_jack->gpio, "headphone-detect-gpio");
-		if (ret)
-			goto failed;
+			wm8753_jack->gpio = TEGRA_GPIO_PW3;
+			wm8753_jack->pcodec = codec;
 
-		ret = gpio_direction_input(wm8753_jack->gpio);
-		if (ret)
-			goto gpio_failed;
+			INIT_WORK(&wm8753_jack->work, wm8753_intr_work);
 
-		tegra_gpio_enable(wm8753_jack->gpio);
+			ret = snd_jack_new(codec->card, "Headphone Jack", SND_JACK_HEADPHONE,
+				&wm8753_jack->jack);
+			if (ret < 0)
+				goto failed;
 
-		ret = request_irq(gpio_to_irq(wm8753_jack->gpio),
-				wm8753_irq,
-				IRQF_TRIGGER_FALLING,
-				"wm8753",
-				wm8753_jack);
+			ret = gpio_request(wm8753_jack->gpio, "headphone-detect-gpio");
+			if (ret)
+				goto failed;
 
-		if (ret)
-			goto gpio_failed;
+			ret = gpio_direction_input(wm8753_jack->gpio);
+			if (ret)
+				goto gpio_failed;
 
-		/* Configure GPIO2 pin to generate the interrupt */
-		value = snd_soc_read(codec, WM8753_GPIO2);
-		value |= (WM8753_GPIO2_GP2M_0 | WM8753_GPIO2_GP2M_1);
-		value &= ~(WM8753_GPIO2_GP2M_2);
-		snd_soc_write(codec, WM8753_GPIO2, value);
+			tegra_gpio_enable(wm8753_jack->gpio);
 
-		/* Active low Interrupt */
-		value = snd_soc_read(codec, WM8753_GPIO1);
-		value |= (WM8753_GPIO1_INTCON_1 | WM8753_GPIO1_INTCON_0);
-		snd_soc_write(codec, WM8753_GPIO1, value);
+			ret = request_irq(gpio_to_irq(wm8753_jack->gpio),
+					wm8753_irq,
+					IRQF_TRIGGER_FALLING,
+					"wm8753",
+					wm8753_jack);
 
-		/* GPIO4 interrupt polarity -- interupt when low i.e Headphone connected */
-		value = snd_soc_read(codec, WM8753_INTPOL);
-		value |= (WM8753_INTPOL_GPIO4IPOL);
-		snd_soc_write(codec, WM8753_INTPOL, value);
+			if (ret)
+				goto gpio_failed;
 
-		/* GPIO4 interrupt enable and disable other interrupts */
-		value = snd_soc_read(codec, WM8753_INTEN);
-		value |= (WM8753_INTEN_GPIO4IEN);
-		value &= ~(WM8753_INTEN_MICSHTEN | WM8753_INTEN_MICDETEN |
-			      WM8753_INTEN_GPIO3IEN | WM8753_INTEN_HPSWIEN |
-			      WM8753_INTEN_GPIO5IEN | WM8753_INTEN_TSDIEN);
-		snd_soc_write(codec, WM8753_INTEN, value);
+			/* Configure GPIO2 pin to generate the interrupt */
+			value = snd_soc_read(codec, WM8753_GPIO2);
+			value |= (WM8753_GPIO2_GP2M_0 | WM8753_GPIO2_GP2M_1);
+			value &= ~(WM8753_GPIO2_GP2M_2);
+			snd_soc_write(codec, WM8753_GPIO2, value);
+
+			/* Active low Interrupt */
+			value = snd_soc_read(codec, WM8753_GPIO1);
+			value |= (WM8753_GPIO1_INTCON_1 | WM8753_GPIO1_INTCON_0);
+			snd_soc_write(codec, WM8753_GPIO1, value);
+
+			/* GPIO4 interrupt polarity -- interupt when low i.e Headphone connected */
+			value = snd_soc_read(codec, WM8753_INTPOL);
+			value |= (WM8753_INTPOL_GPIO4IPOL);
+			snd_soc_write(codec, WM8753_INTPOL, value);
+
+			/* GPIO4 interrupt enable and disable other interrupts */
+			value = snd_soc_read(codec, WM8753_INTEN);
+			value |= (WM8753_INTEN_GPIO4IEN);
+			value &= ~(WM8753_INTEN_MICSHTEN | WM8753_INTEN_MICDETEN |
+				      WM8753_INTEN_GPIO3IEN | WM8753_INTEN_HPSWIEN |
+				      WM8753_INTEN_GPIO5IEN | WM8753_INTEN_TSDIEN);
+			snd_soc_write(codec, WM8753_INTEN, value);
+		}
+
+		audio_data->codec = codec;
+		audio_data->init_done = 1;
 	}
 
 	return ret;
@@ -509,6 +704,22 @@ static struct snd_soc_dai_link tegra_soc_dai[] = {
 		.init = tegra_codec_init,
 		.ops = &tegra_voice_ops,
 	},
+	{
+		.name = "Tegra-spdif",
+		.stream_name = "Tegra Spdif",
+		.cpu_dai = &tegra_spdif_dai,
+		.codec_dai = &tegra_generic_codec_dai[1],
+		.init = tegra_codec_init,
+		.ops = &tegra_spdif_ops,
+	},
+};
+
+static struct tegra_audio_data audio_data = {
+	.init_done = 0,
+	.play_device = TEGRA_AUDIO_DEVICE_NONE,
+	.capture_device = TEGRA_AUDIO_DEVICE_NONE,
+	.is_call_mode = false,
+	.codec_con = TEGRA_AUDIO_OFF,
 };
 
 static struct snd_soc_card tegra_snd_soc = {
@@ -516,11 +727,16 @@ static struct snd_soc_card tegra_snd_soc = {
 	.platform = &tegra_soc_platform,
 	.dai_link = tegra_soc_dai,
 	.num_links = ARRAY_SIZE(tegra_soc_dai),
+	.suspend_pre = tegra_soc_suspend_pre,
+	.suspend_post = tegra_soc_suspend_post,
+	.resume_pre = tegra_soc_resume_pre,
+	.resume_post = tegra_soc_resume_post,
 };
 
 static struct snd_soc_device tegra_snd_devdata = {
 	.card = &tegra_snd_soc,
 	.codec_dev = &soc_codec_dev_wm8753,
+	.codec_data = &audio_data,
 };
 
 static int __init tegra_init(void)
@@ -571,7 +787,6 @@ err_put_regulator:
 
 static void __exit tegra_exit(void)
 {
-	tegra_controls_exit();
 	platform_device_unregister(tegra_snd_device);
 	regulator_disable(wm8753_reg);
 	regulator_put(wm8753_reg);
