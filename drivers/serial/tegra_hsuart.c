@@ -261,14 +261,13 @@ static int tegra_start_dma_rx(struct tegra_uart_port *t)
 static void tegra_rx_dma_threshold_callback(struct tegra_dma_req *req)
 {
 	struct tegra_uart_port *t = req->dev;
-	struct uart_port *u = &t->uport;
 	unsigned long flags;
 
-	spin_lock_irqsave(&u->lock, flags);
+	spin_lock_irqsave(&t->uport.lock, flags);
 
 	do_handle_rx_dma(t);
 
-	spin_unlock_irqrestore(&u->lock, flags);
+	spin_unlock_irqrestore(&t->uport.lock, flags);
 }
 
 /* It is expected that the callers take the UART lock when this API is called.
@@ -564,14 +563,19 @@ static void tegra_stop_rx(struct uart_port *u)
 		set_rts(t, false);
 
 	if (t->rx_in_progress) {
+		wait_sym_time(t, 1); /* wait a character interval */
+
 		ier = t->ier_shadow;
 		ier &= ~(UART_IER_RDI | UART_IER_RLSI | UART_IER_RTOIE | UART_IER_EORD);
 		t->ier_shadow = ier;
 		uart_writeb(t, ier, UART_IER);
 		t->rx_in_progress = 0;
-	}
-	if (t->use_rx_dma && t->rx_dma) {
-		tegra_dma_dequeue(t->rx_dma);
+
+		if (t->use_rx_dma && t->rx_dma)
+			tegra_dma_dequeue(t->rx_dma);
+		else
+			do_handle_rx_pio(t);
+
 		tty_flip_buffer_push(u->state->port.tty);
 	}
 
