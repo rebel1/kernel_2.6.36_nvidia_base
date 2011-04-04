@@ -34,6 +34,7 @@
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
 #include <linux/tegra_audio.h>
+#include <linux/regulator/consumer.h>
 #include <mach/iomap.h>
 #include <mach/tegra2_i2s.h>
 #include <mach/spdif.h>
@@ -107,6 +108,9 @@ struct wired_jack_conf {
 	int en_mic_ext;
 	int cdc_irq;
 	int en_spkr;
+	const char *spkr_amp_reg;
+	struct regulator *amp_reg;
+	int amp_reg_enabled;
 };
 
 int tegra_controls_init(struct snd_soc_codec *codec);

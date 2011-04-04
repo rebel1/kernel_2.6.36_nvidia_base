@@ -20,6 +20,7 @@
 
 #include <linux/gpio.h>
 #include <sound/soc-dapm.h>
+#include <linux/regulator/consumer.h>
 #include <mach/audio.h>
 
 #include "tegra_soc.h"
@@ -85,8 +86,18 @@ static void tegra_ext_control(struct snd_soc_codec *codec)
 
 	if (tegra_spk_func == TEGRA_INT_SPK_ON) {
 		snd_soc_dapm_enable_pin(codec, "Int Spk");
+		if (tegra_wired_jack_conf.amp_reg &&
+			!tegra_wired_jack_conf.amp_reg_enabled) {
+			regulator_enable(tegra_wired_jack_conf.amp_reg);
+			tegra_wired_jack_conf.amp_reg_enabled = 1;
+		}
 	} else {
-		snd_soc_dapm_disable_pin(codec, "Int Spk");
+	    snd_soc_dapm_disable_pin(codec, "Int Spk");
+		if (tegra_wired_jack_conf.amp_reg &&
+			tegra_wired_jack_conf.amp_reg_enabled) {
+			regulator_disable(tegra_wired_jack_conf.amp_reg);
+			tegra_wired_jack_conf.amp_reg_enabled = 0;
+		}
 	}
 
 	/* signal a DAPM event */
@@ -270,12 +281,15 @@ static void tegra_audio_route(int device_new, int is_call_mode_new)
 	if (play_device_new != audio_data->play_device) {
 		if (play_device_new & TEGRA_AUDIO_DEVICE_OUT_HEADPHONE) {
 			tegra_jack_func = TEGRA_HP;
+			tegra_spk_func = TEGRA_INT_SPK_OFF;
 		}
 		else if (play_device_new & TEGRA_AUDIO_DEVICE_OUT_HEADSET) {
 			tegra_jack_func = TEGRA_HEADSET;
+			tegra_spk_func = TEGRA_INT_SPK_OFF;
 		}
 		else if (play_device_new & TEGRA_AUDIO_DEVICE_OUT_LINE) {
 			tegra_jack_func = TEGRA_LINE;
+			tegra_spk_func = TEGRA_INT_SPK_OFF;
 		}
 
 		if (play_device_new & TEGRA_AUDIO_DEVICE_OUT_SPEAKER) {
@@ -537,7 +551,7 @@ int tegra_controls_init(struct snd_soc_codec *codec)
 		/* Default to HP output */
 		tegra_jack_func = TEGRA_HP;
 		tegra_lineout_func = TEGRA_LINEOUT_ON;
-		tegra_spk_func = TEGRA_INT_SPK_ON;
+		tegra_spk_func = TEGRA_INT_SPK_OFF;
 		tegra_ext_control(codec);
 
 		snd_soc_dapm_sync(codec);

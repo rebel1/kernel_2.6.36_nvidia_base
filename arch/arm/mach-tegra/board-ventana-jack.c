@@ -22,6 +22,7 @@
 #include <sound/jack.h>
 #include <sound/soc.h>
 #include <mach/gpio.h>
+#include <linux/regulator/consumer.h>
 #include <mach/audio.h>
 
 #include "gpio-names.h"
@@ -33,6 +34,7 @@ static struct tegra_wired_jack_conf ventana_wr_jack_conf = {
 	.en_mic_int = TEGRA_GPIO_PX0,
 	.en_spkr = WM8903_GP3,
 	.cdc_irq = TEGRA_GPIO_PX3,
+	.spkr_amp_reg = "avdd_amp"
 };
 
 static struct platform_device ventana_hs_jack_device = {

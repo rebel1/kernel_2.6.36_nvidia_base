@@ -32,9 +32,10 @@
 
 #define HEAD_DET_GPIO 0
 #define MIC_DET_GPIO  1
+#define SPK_EN_GPIO   3
 
 struct wired_jack_conf tegra_wired_jack_conf = {
-	-1, -1, -1, -1
+	-1, -1, -1, -1, 0, NULL, NULL
 };
 
 /* jack */
@@ -79,7 +80,6 @@ static struct switch_dev wired_switch_dev = {
 
 void tegra_switch_set_state(int state)
 {
-
 	switch_set_state(&wired_switch_dev, state);
 }
 
@@ -204,6 +204,11 @@ static int tegra_wired_jack_probe(struct platform_device *pdev)
 	gpio_direction_output(en_spkr, 0);
 	gpio_export(en_spkr, false);
 
+	if (pdata->spkr_amp_reg)
+		tegra_wired_jack_conf.amp_reg =
+			regulator_get(NULL, pdata->spkr_amp_reg);
+	tegra_wired_jack_conf.amp_reg_enabled = 0;
+
 	/* restore configuration of these pins */
 	tegra_wired_jack_conf.hp_det_n = hp_det_n;
 	tegra_wired_jack_conf.en_mic_int = en_mic_int;
@@ -215,7 +220,6 @@ static int tegra_wired_jack_probe(struct platform_device *pdev)
 	snd_soc_jack_notifier_register(tegra_wired_jack,
 				       &wired_switch_nb);
 #endif
-
 	return ret;
 }
 
@@ -228,6 +232,12 @@ static int tegra_wired_jack_remove(struct platform_device *pdev)
 	gpio_free(tegra_wired_jack_conf.en_mic_int);
 	gpio_free(tegra_wired_jack_conf.en_mic_ext);
 	gpio_free(tegra_wired_jack_conf.en_spkr);
+
+	if (tegra_wired_jack_conf.amp_reg) {
+		if (tegra_wired_jack_conf.amp_reg_enabled)
+			regulator_disable(tegra_wired_jack_conf.amp_reg);
+		regulator_put(tegra_wired_jack_conf.amp_reg);
+	}
 
 	return 0;
 }
