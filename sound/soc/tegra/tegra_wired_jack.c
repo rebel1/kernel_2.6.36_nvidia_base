@@ -38,6 +38,14 @@ struct wired_jack_conf tegra_wired_jack_conf = {
 	-1, -1, -1, -1, 0, NULL, NULL
 };
 
+/* Based on hp_gpio and mic_gpio, hp_gpio is active low */
+enum {
+	HEADSET_WITHOUT_MIC = 0x00,
+	HEADSET_WITH_MIC = 0x01,
+	NO_DEVICE = 0x10,
+	MIC = 0x11,
+};
+
 /* jack */
 static struct snd_soc_jack *tegra_wired_jack;
 
@@ -83,7 +91,7 @@ void tegra_switch_set_state(int state)
 	switch_set_state(&wired_switch_dev, state);
 }
 
-static int wired_swith_notify(struct notifier_block *self,
+static int wired_switch_notify(struct notifier_block *self,
 			      unsigned long action, void* dev)
 {
 	int state = 0;
@@ -96,6 +104,8 @@ static int wired_swith_notify(struct notifier_block *self,
 		hp_gpio = gpio_get_value(tegra_wired_jack_conf.hp_det_n);
 	if (tegra_wired_jack_conf.cdc_irq != -1)
 		mic_gpio = gpio_get_value(tegra_wired_jack_conf.cdc_irq);
+
+	pr_debug("hp_gpio:%d, mic_gpio:%d\n", hp_gpio, mic_gpio);
 
 	flag = (hp_gpio << 4) | mic_gpio;
 
@@ -115,16 +125,16 @@ static int wired_swith_notify(struct notifier_block *self,
 		break;
 	default:
 		switch (flag) {
-		case 0x010:
+		case NO_DEVICE:
 			state = 0;
 			break;
-		case 0x01:
+		case HEADSET_WITH_MIC:
 			state = 1;
 			break;
-		case 0x11:
+		case MIC:
 			/* mic: would not report */
 			break;
-		case 0x00:
+		case HEADSET_WITHOUT_MIC:
 			state = 2;
 			break;
 		default:
@@ -137,8 +147,14 @@ static int wired_swith_notify(struct notifier_block *self,
 	return NOTIFY_OK;
 }
 
+
+void tegra_jack_resume(void)
+{
+	wired_switch_notify(NULL, SND_JACK_NO_TYPE_SPECIFIED, NULL);
+}
+
 static struct notifier_block wired_switch_nb = {
-	.notifier_call = wired_swith_notify,
+	.notifier_call = wired_switch_notify,
 };
 #endif
 

@@ -118,6 +118,7 @@ void tegra_controls_exit(void);
 
 int tegra_jack_init(struct snd_soc_codec *codec);
 void tegra_jack_exit(void);
+void tegra_jack_resume(void);
 void tegra_switch_set_state(int state);
 
 void setup_i2s_dma_request(struct snd_pcm_substream *substream,
