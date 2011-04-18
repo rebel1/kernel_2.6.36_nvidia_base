@@ -146,12 +146,6 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 		CtrlReg = snd_soc_read(codec, WM8903_POWER_MANAGEMENT_6);
 		CtrlReg |= (0x1<<B00_ADCR_ENA)|(0x1<<B01_ADCL_ENA);
 		snd_soc_write(codec, WM8903_POWER_MANAGEMENT_6, CtrlReg);
-		/* Enable Sidetone */
-		SidetoneCtrlReg = (0x1<<2) | (0x2<<0);
-		SideToneAtenuation = 12 ; /* sidetone 0 db */
-		SidetoneCtrlReg |= (SideToneAtenuation<<8)
-				| (SideToneAtenuation<<4);
-		snd_soc_write(codec, R20_SIDETONE_CTRL, SidetoneCtrlReg);
 		CtrlReg = snd_soc_read(codec, R29_DRC_1);
 		CtrlReg |= 0x3; /*mic volume 18 db */
 		snd_soc_write(codec, R29_DRC_1, CtrlReg);
