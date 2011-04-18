@@ -980,11 +980,11 @@ static void nvhdcp_downstream_worker(struct work_struct *work)
 	nvhdcp_info("link verified!\n");
 
 	while (1) {
-		if (nvhdcp->state != STATE_LINK_VERIFY)
-			goto failure;
-
 		if (!nvhdcp_is_plugged(nvhdcp))
 			goto lost_hdmi;
+
+		if (nvhdcp->state != STATE_LINK_VERIFY)
+			goto failure;
 
 		e = verify_link(nvhdcp, true);
 		if (e) {
@@ -1003,7 +1003,9 @@ failure:
 	        nvhdcp_err("nvhdcp failure - too many failures, giving up!\n");
 	} else {
 		nvhdcp_err("nvhdcp failure - renegotiating in 1.75 seconds\n");
+		mutex_unlock(&nvhdcp->lock);
 		msleep(1750);
+		mutex_lock(&nvhdcp->lock);
 		queue_work(nvhdcp->downstream_wq, &nvhdcp->work);
 	}
 
