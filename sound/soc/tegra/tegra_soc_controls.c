@@ -28,10 +28,10 @@ static void tegra_audio_route(struct tegra_audio_data* audio_data,
 	int codec_con = audio_data->codec_con;
 	int is_bt_sco_mode =
 		(play_device_new & TEGRA_AUDIO_DEVICE_OUT_BT_SCO) ||
-		(capture_device_new & TEGRA_AUDIO_DEVICE_OUT_BT_SCO);
+		(capture_device_new & TEGRA_AUDIO_DEVICE_IN_BT_SCO);
 	int was_bt_sco_mode =
 		(audio_data->play_device & TEGRA_AUDIO_DEVICE_OUT_BT_SCO) ||
-		(audio_data->capture_device & TEGRA_AUDIO_DEVICE_OUT_BT_SCO);
+		(audio_data->capture_device & TEGRA_AUDIO_DEVICE_IN_BT_SCO);
 
 	if (play_device_new != audio_data->play_device) {
 		codec_con &= ~(TEGRA_HEADPHONE | TEGRA_LINEOUT |
