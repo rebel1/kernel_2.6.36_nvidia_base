@@ -77,4 +77,9 @@ void tegra_set_lp0_wake_pads(u32 wake_enb, u32 wake_level, u32 wake_any);
 
 void __init tegra_init_suspend(struct tegra_suspend_platform_data *plat);
 
+/*
+ * Callbacks for platform drivers to implement.
+ */
+extern void (*tegra_deep_sleep)(int);
+
 #endif /* _MACH_TEGRA_SUSPEND_H_ */
