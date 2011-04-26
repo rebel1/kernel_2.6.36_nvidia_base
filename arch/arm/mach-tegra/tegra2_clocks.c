@@ -442,6 +442,29 @@ static struct clk_ops tegra_cpu_ops = {
 	.set_rate = tegra2_cpu_clk_set_rate,
 };
 
+static void tegra2_vsclk_init(struct clk *c)
+{
+	c->max_rate = c->parent->max_rate;
+	c->min_rate = c->parent->min_rate;
+}
+
+static long tegra2_vsclk_round_rate(struct clk *c, unsigned long rate)
+{
+	long new_rate = rate;
+	return new_rate;
+}
+
+static int tegra2_vsclk_set_rate(struct clk *c, unsigned long rate)
+{
+	return clk_set_rate(c->parent, rate);
+}
+
+static struct clk_ops tegra_vsclk_ops = {
+	.init = tegra2_vsclk_init,
+	.set_rate = tegra2_vsclk_set_rate,
+	.round_rate = tegra2_vsclk_round_rate,
+};
+
 /* virtual cop clock functions. Used to acquire the fake 'cop' clock to
  * reset the COP block (i.e. AVP) */
 static void tegra2_cop_clk_reset(struct clk *c, bool assert)
@@ -1815,7 +1838,7 @@ static struct clk tegra_clk_sclk = {
 	.reg	= 0x28,
 	.ops	= &tegra_super_ops,
 	.max_rate = 240000000,
-	.min_rate = 120000000,
+	.min_rate = 40000000,
 };
 
 static struct clk tegra_clk_virtual_cpu = {
@@ -1844,6 +1867,7 @@ static struct clk tegra_clk_hclk = {
 	.reg_shift	= 4,
 	.ops		= &tegra_bus_ops,
 	.max_rate       = 240000000,
+	.min_rate	= 36000000,
 };
 
 static struct clk tegra_clk_pclk = {
@@ -1854,6 +1878,13 @@ static struct clk tegra_clk_pclk = {
 	.reg_shift	= 0,
 	.ops		= &tegra_bus_ops,
 	.max_rate       = 120000000,
+	.min_rate	= 36000000,
+};
+
+static struct clk tegra_clk_virtual_sclk = {
+	.name	= "vsclk",
+	.parent	= &tegra_clk_sclk,
+	.ops	= &tegra_vsclk_ops,
 };
 
 static struct clk tegra_clk_blink = {
@@ -2087,7 +2118,11 @@ struct clk tegra_list_clks[] = {
 	PERIPH_CLK("csus",	"tegra_camera",		"csus",	92,	0,	0x31E,	150000000, mux_clk_m,			PERIPH_NO_RESET),
 	PERIPH_CLK("stat_mon",	"tegra-stat-mon",	NULL,	37,	0,	0x31E,	26000000,  mux_clk_m,			0),
 
-	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_sclk),
+	SHARED_CLK("avp.sclk",	"tegra-avp",		"sclk",	&tegra_clk_virtual_sclk),
+	SHARED_CLK("usbd.sclk",	"fsl-tegra-udc",	"sclk",	&tegra_clk_virtual_sclk),
+	SHARED_CLK("usb1.sclk",	"tegra-ehci.0",		"sclk",	&tegra_clk_virtual_sclk),
+	SHARED_CLK("usb2.sclk",	"tegra-ehci.1",		"sclk",	&tegra_clk_virtual_sclk),
+	SHARED_CLK("usb3.sclk",	"tegra-ehci.2",		"sclk",	&tegra_clk_virtual_sclk),
 	SHARED_CLK("avp.emc",	"tegra-avp",		"emc",	&tegra_clk_emc),
 	SHARED_CLK("cpu.emc",	"cpu",			"emc",	&tegra_clk_emc),
 	SHARED_CLK("disp1.emc",	"tegradc.0",		"emc",	&tegra_clk_emc),
@@ -2175,6 +2210,7 @@ struct clk *tegra_ptr_clks[] = {
 	&tegra_dev1_clk,
 	&tegra_dev2_clk,
 	&tegra_clk_virtual_cpu,
+	&tegra_clk_virtual_sclk,
 	&tegra_clk_blink,
 	&tegra_clk_cop,
 	&tegra_clk_emc,
