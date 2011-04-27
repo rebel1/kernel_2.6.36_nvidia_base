@@ -38,6 +38,8 @@
 #include "../nvmap/nvmap.h"
 #include "overlay.h"
 
+DEFINE_MUTEX(tegra_flip_lock);
+
 struct overlay_client;
 
 struct overlay {
@@ -297,7 +299,7 @@ static void tegra_overlay_flip_worker(struct work_struct *work)
 		tegra_dc_sync_windows(wins, nr_win);
 	}
 
-	tegra_dc_incr_syncpt_min(overlay->dc, data->syncpt_max);
+		tegra_dc_incr_syncpt_min(overlay->dc, data->syncpt_max);
 
 	/* unpin and deref previous front buffers */
 	for (i = 0; i < nr_unpin; i++) {
@@ -320,10 +322,17 @@ static int tegra_overlay_flip(struct tegra_overlay_info *overlay,
 	if (WARN_ON(!overlay->ndev))
 		return -EFAULT;
 
+	mutex_lock(&tegra_flip_lock);
+	if (!overlay->dc->enabled) {
+		mutex_unlock(&tegra_flip_lock);
+		return -EFAULT;
+	}
+
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (data == NULL) {
 		dev_err(&overlay->ndev->dev,
 			"can't allocate memory for flip\n");
+		mutex_unlock(&tegra_flip_lock);
 		return -ENOMEM;
 	}
 
@@ -354,6 +363,7 @@ static int tegra_overlay_flip(struct tegra_overlay_info *overlay,
 
 	args->post_syncpt_val = syncpt_max;
 	args->post_syncpt_id = tegra_dc_get_syncpt_id(overlay->dc);
+	mutex_unlock(&tegra_flip_lock);
 
 	return 0;
 
@@ -367,6 +377,7 @@ surf_err:
 		}
 	}
 	kfree(data);
+	mutex_unlock(&tegra_flip_lock);
 	return err;
 }
 static void tegra_overlay_set_emc_freq(struct tegra_overlay_info *dev)
@@ -725,5 +736,7 @@ void tegra_overlay_unregister(struct tegra_overlay_info *info)
 
 void tegra_overlay_disable(struct tegra_overlay_info *overlay_info)
 {
+	mutex_lock(&tegra_flip_lock);
 	flush_workqueue(overlay_info->flip_wq);
+	mutex_unlock(&tegra_flip_lock);
 }
