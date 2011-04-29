@@ -744,6 +744,128 @@ void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk)
 	tegra_dvfs_set_rate(clk, pclk);
 }
 
+/* return non-zero if constraint is violated */
+static int calc_h_ref_to_sync(const struct tegra_dc_mode *mode, int *href)
+{
+	long a, b;
+
+	/* Constraint 5: H_REF_TO_SYNC >= 0 */
+	a = 0;
+
+	/* Constraint 6: H_FRONT_PORT >= (H_REF_TO_SYNC + 1) */
+	b = mode->h_front_porch - 1;
+
+	/* Constraint 1: H_REF_TO_SYNC + H_SYNC_WIDTH + H_BACK_PORCH > 11 */
+	if (a + mode->h_sync_width + mode->h_back_porch <= 11)
+		a = 1 + 11 - mode->h_sync_width - mode->h_back_porch;
+	/* check Constraint 1 and 6 */
+	if (a > b)
+		return 1;
+
+	/* Constraint 4: H_SYNC_WIDTH >= 1 */
+	if (mode->h_sync_width < 1)
+		return 4;
+
+	/* Constraint 7: H_DISP_ACTIVE >= 16 */
+	if (mode->h_active < 16)
+		return 7;
+
+	if (href) {
+		if (b > a && a % 2)
+			*href = a + 1; /* use smallest even value */
+		else
+			*href = a; /* even or only possible value */
+	}
+
+	return 0;
+}
+
+static int calc_v_ref_to_sync(const struct tegra_dc_mode *mode, int *vref)
+{
+	long a;
+	a = 1; /* Constraint 5: V_REF_TO_SYNC >= 1 */
+
+	/* Constraint 2: V_REF_TO_SYNC + V_SYNC_WIDTH + V_BACK_PORCH > 1 */
+	if (a + mode->v_sync_width + mode->v_back_porch <= 1)
+		a = 1 + 1 - mode->v_sync_width - mode->v_back_porch;
+
+	/* Constraint 6 */
+	if (mode->v_front_porch < a + 1)
+		a = mode->v_front_porch - 1;
+
+	/* Constraint 4: V_SYNC_WIDTH >= 1 */
+	if (mode->v_sync_width < 1)
+		return 4;
+
+	/* Constraint 7: V_DISP_ACTIVE >= 16 */
+	if (mode->v_active < 16)
+		return 7;
+
+        if (vref)
+                *vref = a;
+	return 0;
+}
+
+static int calc_ref_to_sync(struct tegra_dc_mode *mode)
+{
+	int ret;
+	ret = calc_h_ref_to_sync(mode, &mode->h_ref_to_sync);
+	if (ret)
+		return ret;
+	ret = calc_v_ref_to_sync(mode, &mode->v_ref_to_sync);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+#ifdef DEBUG
+/* return in 1000ths of a Hertz */
+static int calc_refresh(const struct tegra_dc_mode *m)
+{
+	long h_total, v_total, refresh;
+	h_total = m->h_active + m->h_front_porch + m->h_back_porch +
+		m->h_sync_width;
+	v_total = m->v_active + m->v_front_porch + m->v_back_porch +
+		m->v_sync_width;
+	refresh = m->pclk / h_total;
+	refresh *= 1000;
+	refresh /= v_total;
+	return refresh;
+}
+
+static void print_mode(struct tegra_dc *dc,
+			const struct tegra_dc_mode *mode, const char *note)
+{
+	if (mode) {
+		int refresh = calc_refresh(mode);
+		dev_info(&dc->ndev->dev, "%s():MODE:%dx%d@%d.%03uHz pclk=%d\n",
+			note ? note : "",
+			mode->h_active, mode->v_active,
+			refresh / 1000, refresh % 1000,
+			mode->pclk);
+	}
+}
+#else
+static inline void print_mode(struct tegra_dc *dc,
+			const struct tegra_dc_mode *mode, const char *note) { }
+#endif
+
+static inline void enable_dc_irq(unsigned int irq)
+{
+#ifdef CONFIG_TEGRA_FPGA_PLATFORM
+	/* Always disable DC interrupts on FPGA. */
+	disable_irq(irq);
+#else
+	enable_irq(irq);
+#endif
+}
+
+static inline void disable_dc_irq(unsigned int irq)
+{
+	disable_irq(irq);
+}
+
 static int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode)
 {
 	unsigned long val;
@@ -828,6 +950,52 @@ int tegra_dc_set_mode(struct tegra_dc *dc, const struct tegra_dc_mode *mode)
 	return 0;
 }
 EXPORT_SYMBOL(tegra_dc_set_mode);
+
+int tegra_dc_set_fb_mode(struct tegra_dc *dc,
+		const struct fb_videomode *fbmode, bool stereo_mode)
+{
+	struct tegra_dc_mode mode;
+
+	mode.pclk = PICOS2KHZ(fbmode->pixclock) * 1000;
+	mode.h_sync_width = fbmode->hsync_len;
+	mode.v_sync_width = fbmode->vsync_len;
+	mode.h_back_porch = fbmode->left_margin;
+	mode.v_back_porch = fbmode->upper_margin;
+	mode.h_active = fbmode->xres;
+	mode.v_active = fbmode->yres;
+	mode.h_front_porch = fbmode->right_margin;
+	mode.v_front_porch = fbmode->lower_margin;
+	mode.stereo_mode = stereo_mode;
+	if (calc_ref_to_sync(&mode)) {
+		dev_err(&dc->ndev->dev, "bad href/vref values, overriding.\n");
+		mode.h_ref_to_sync = 11;
+		mode.v_ref_to_sync = 1;
+	}
+	dev_info(&dc->ndev->dev, "Using mode %dx%d pclk=%d href=%d vref=%d\n",
+		mode.h_active, mode.v_active, mode.pclk,
+		mode.h_ref_to_sync, mode.v_ref_to_sync
+	);
+
+	if (mode.stereo_mode) {
+		mode.pclk *= 2;
+		/* total v_active = yres*2 + activespace */
+		mode.v_active = fbmode->yres*2 +
+				fbmode->vsync_len +
+				fbmode->upper_margin +
+				fbmode->lower_margin;
+	}
+
+	mode.flags = 0;
+
+	if (!(fbmode->sync & FB_SYNC_HOR_HIGH_ACT))
+		mode.flags |= TEGRA_DC_MODE_FLAG_NEG_H_SYNC;
+
+	if (!(fbmode->sync & FB_SYNC_VERT_HIGH_ACT))
+		mode.flags |= TEGRA_DC_MODE_FLAG_NEG_V_SYNC;
+
+	return tegra_dc_set_mode(dc, &mode);
+}
+EXPORT_SYMBOL(tegra_dc_set_fb_mode);
 
 void
 tegra_dc_config_pwm(struct tegra_dc *dc, struct tegra_dc_pwm_params *cfg)
