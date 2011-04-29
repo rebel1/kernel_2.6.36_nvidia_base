@@ -49,11 +49,15 @@
 #define TEGRA_FB_WIN_BLEND_PREMULT 1
 #define TEGRA_FB_WIN_BLEND_COVERAGE 2
 
+#define TEGRA_FB_WIN_LAYOUT_LINEAR 0
+#define TEGRA_FB_WIN_LAYOUT_TILED 1
+
 /* set index to -1 to ignore window data */
 struct tegra_fb_windowattr {
 	__s32	index;
 	__u32	buff_id;
 	__u32	blend;
+	__u32	layout;
 	__u32	offset;
 	__u32	offset_u;
 	__u32	offset_v;
