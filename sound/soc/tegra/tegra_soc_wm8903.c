@@ -179,7 +179,6 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 	if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK) {
 		int CtrlReg = 0;
 		int VolumeCtrlReg = 0;
-		int SidetoneCtrlReg = 0;
 
 		snd_soc_write(codec, WM8903_ANALOGUE_LEFT_INPUT_0, 0X7);
 		snd_soc_write(codec, WM8903_ANALOGUE_RIGHT_INPUT_0, 0X7);
@@ -203,23 +202,24 @@ static int tegra_hifi_hw_params(struct snd_pcm_substream *substream,
 				VolumeCtrlReg);
 		snd_soc_write(codec, WM8903_ANALOGUE_RIGHT_INPUT_0,
 				VolumeCtrlReg);
-		/* replicate mic setting on both channels */
+		/* Left ADC data on both channels */
 		CtrlReg = snd_soc_read(codec, WM8903_AUDIO_INTERFACE_0);
 		CtrlReg  = SET_REG_VAL(CtrlReg, 0x1, B06_AIF_ADCR, 0x0);
 		CtrlReg  = SET_REG_VAL(CtrlReg, 0x1, B06_AIF_ADCL, 0x0);
 		snd_soc_write(codec, WM8903_AUDIO_INTERFACE_0, CtrlReg);
 		/* Enable analog inputs */
-		CtrlReg = (0x1<<B01_INL_ENA) | (0x1<<B00_INR_ENA);
+		CtrlReg = (0x1<<B01_INL_ENA);
 		snd_soc_write(codec, WM8903_POWER_MANAGEMENT_0, CtrlReg);
 		/* ADC Settings */
 		CtrlReg = snd_soc_read(codec, WM8903_ADC_DIGITAL_0);
 		CtrlReg |= (0x1<<B04_ADC_HPF_ENA);
 		snd_soc_write(codec, WM8903_ADC_DIGITAL_0, CtrlReg);
-		SidetoneCtrlReg = 0;
-		snd_soc_write(codec, R20_SIDETONE_CTRL, SidetoneCtrlReg);
+		/* Disable sidetone */
+		CtrlReg = 0;
+		snd_soc_write(codec, R20_SIDETONE_CTRL, CtrlReg);
 		/* Enable ADC */
 		CtrlReg = snd_soc_read(codec, WM8903_POWER_MANAGEMENT_6);
-		CtrlReg |= (0x1<<B00_ADCR_ENA)|(0x1<<B01_ADCL_ENA);
+		CtrlReg |= (0x1<<B01_ADCL_ENA);
 		snd_soc_write(codec, WM8903_POWER_MANAGEMENT_6, CtrlReg);
 		CtrlReg = snd_soc_read(codec, R29_DRC_1);
 		CtrlReg |= 0x3; /*mic volume 18 db */
@@ -383,10 +383,15 @@ void tegra_ext_control(struct snd_soc_codec *codec, int new_con)
 	else
 		snd_soc_dapm_disable_pin(codec, "Linein");
 
-	if (new_con & TEGRA_HEADSET)
-		snd_soc_dapm_enable_pin(codec, "Headset");
+	if (new_con & TEGRA_HEADSET_OUT)
+		snd_soc_dapm_enable_pin(codec, "Headset Out");
 	else
-		snd_soc_dapm_disable_pin(codec, "Headset");
+		snd_soc_dapm_disable_pin(codec, "Headset Out");
+
+	if (new_con & TEGRA_HEADSET_IN)
+		snd_soc_dapm_enable_pin(codec, "Headset In");
+	else
+		snd_soc_dapm_disable_pin(codec, "Headset In");
 
 	/* signal a DAPM event */
 	snd_soc_dapm_sync(codec);
@@ -448,7 +453,8 @@ static int tegra_dapm_event_ext_mic(struct snd_soc_dapm_widget* w,
 /*tegra machine dapm widgets */
 static const struct snd_soc_dapm_widget tegra_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("Headphone", NULL),
-	SND_SOC_DAPM_HP("Headset", NULL),
+	SND_SOC_DAPM_HP("Headset Out", NULL),
+	SND_SOC_DAPM_MIC("Headset In", NULL),
 	SND_SOC_DAPM_SPK("Lineout", NULL),
 	SND_SOC_DAPM_SPK("Int Spk", tegra_dapm_event_int_spk),
 	SND_SOC_DAPM_MIC("Ext Mic", tegra_dapm_event_ext_mic),
@@ -464,10 +470,9 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"Headphone", NULL, "HPOUTL"},
 
 	/* headset Jack  - in = micin, out = HPOUT*/
-	{"Headset", NULL, "HPOUTR"},
-	{"Headset", NULL, "HPOUTL"},
-	{"IN1L", NULL, "Headset"},
-	{"IN1R", NULL, "Headset"},
+	{"Headset Out", NULL, "HPOUTR"},
+	{"Headset Out", NULL, "HPOUTL"},
+	{"IN1L", NULL, "Headset In"},
 
 	/* lineout connected to LINEOUTR and LINEOUTL */
 	{"Lineout", NULL, "LINEOUTR"},
@@ -480,9 +485,9 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"Int Spk", NULL, "LOP"},
 
 	/* internal mic is mono */
-	{"IN1R", NULL, "Int Mic"},
+	{"IN1L", NULL, "Int Mic"},
 
-	/* external mic is stero */
+	/* external mic is stereo */
 	{"IN1L", NULL, "Ext Mic"},
 	{"IN1R", NULL, "Ext Mic"},
 

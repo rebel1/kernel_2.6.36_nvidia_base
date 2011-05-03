@@ -470,10 +470,15 @@ void tegra_ext_control(struct snd_soc_codec *codec, int new_con)
 	else
 		snd_soc_dapm_disable_pin(codec, "Linein");
 
-	if (new_con & TEGRA_HEADSET)
-		snd_soc_dapm_enable_pin(codec, "Headset");
+	if (new_con & TEGRA_HEADSET_OUT)
+		snd_soc_dapm_enable_pin(codec, "Headset Out");
 	else
-		snd_soc_dapm_disable_pin(codec, "Headset");
+		snd_soc_dapm_disable_pin(codec, "Headset Out");
+
+	if (new_con & TEGRA_HEADSET_IN)
+		snd_soc_dapm_enable_pin(codec, "Headset In");
+	else
+		snd_soc_dapm_disable_pin(codec, "Headset In");
 
 	/* signal a DAPM event */
 	snd_soc_dapm_sync(codec);
@@ -484,7 +489,8 @@ void tegra_ext_control(struct snd_soc_codec *codec, int new_con)
 static const struct snd_soc_dapm_widget tegra_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("Headphone", NULL),
 	SND_SOC_DAPM_HP("EarPiece", NULL),
-	SND_SOC_DAPM_HP("Headset", NULL),
+	SND_SOC_DAPM_HP("Headset Out", NULL),
+	SND_SOC_DAPM_MIC("Headset In", NULL),
 	SND_SOC_DAPM_SPK("Int Spk", NULL),
 	SND_SOC_DAPM_MIC("Ext Mic", NULL),
 	SND_SOC_DAPM_MIC("Int Mic", NULL),
@@ -503,10 +509,10 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"EarPiece", NULL, "LOUT2"},
 
 	/* headset Jack */
-	{"Headset", NULL, "ROUT1"},
-	{"Headset", NULL, "LOUT1"},
+	{"Headset Out", NULL, "ROUT1"},
+	{"Headset Out", NULL, "LOUT1"},
 	{"MIC1", NULL, "Mic Bias"},
-	{"Mic Bias", NULL, "Headset"},
+	{"Mic Bias", NULL, "Headset In"},
 
 	/* build-in speaker */
 	{"Int Spk", NULL, "ROUT1"},

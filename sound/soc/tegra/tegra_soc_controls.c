@@ -35,7 +35,7 @@ static void tegra_audio_route(struct tegra_audio_data* audio_data,
 
 	if (play_device_new != audio_data->play_device) {
 		codec_con &= ~(TEGRA_HEADPHONE | TEGRA_LINEOUT |
-			TEGRA_SPK | TEGRA_EAR_SPK | TEGRA_HEADSET);
+			TEGRA_SPK | TEGRA_EAR_SPK | TEGRA_HEADSET_OUT);
 
 		if (play_device_new & TEGRA_AUDIO_DEVICE_OUT_HEADPHONE)
 			codec_con |= TEGRA_HEADPHONE;
@@ -50,7 +50,7 @@ static void tegra_audio_route(struct tegra_audio_data* audio_data,
 			codec_con |= TEGRA_EAR_SPK;
 
 		if (play_device_new & TEGRA_AUDIO_DEVICE_OUT_HEADSET)
-			codec_con |= TEGRA_HEADSET;
+			codec_con |= TEGRA_HEADSET_OUT;
 
 		tegra_ext_control(audio_data->codec, codec_con);
 		audio_data->play_device = play_device_new;
@@ -58,7 +58,7 @@ static void tegra_audio_route(struct tegra_audio_data* audio_data,
 
 	if (capture_device_new != audio_data->capture_device) {
 		codec_con &= ~(TEGRA_INT_MIC | TEGRA_EXT_MIC |
-			TEGRA_LINEIN | TEGRA_HEADSET);
+			TEGRA_LINEIN | TEGRA_HEADSET_IN);
 
 		if (capture_device_new & (TEGRA_AUDIO_DEVICE_IN_BUILTIN_MIC |
 			TEGRA_AUDIO_DEVICE_IN_BACK_MIC))
@@ -71,7 +71,7 @@ static void tegra_audio_route(struct tegra_audio_data* audio_data,
 			codec_con |= TEGRA_LINEIN;
 
 		if (capture_device_new & TEGRA_AUDIO_DEVICE_IN_HEADSET)
-			codec_con |= TEGRA_HEADSET;
+			codec_con |= TEGRA_HEADSET_IN;
 
 		tegra_ext_control(audio_data->codec, codec_con);
 		audio_data->capture_device = capture_device_new;

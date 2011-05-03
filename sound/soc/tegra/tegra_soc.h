@@ -88,7 +88,8 @@
 #define TEGRA_INT_MIC		0x10
 #define TEGRA_EXT_MIC		0x20
 #define TEGRA_LINEIN		0x40
-#define TEGRA_HEADSET		0x80
+#define TEGRA_HEADSET_OUT	0x80
+#define TEGRA_HEADSET_IN	0x100
 
 struct tegra_dma_channel;
 
