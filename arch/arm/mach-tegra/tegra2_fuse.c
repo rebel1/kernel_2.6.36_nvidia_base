@@ -665,6 +665,7 @@ static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
 	int ret, i = 0;
 	struct fuse_data data = {0};
 	u32 *raw_data = ((u32 *)&data) + fuse_info_tbl[param].data_offset;
+	u8 *raw_byte_data = (u8 *)raw_data;
 	struct wake_lock fuse_wk_lock;
 
 	if ((param == -1) || (param == -ENODATA)) {
@@ -672,10 +673,8 @@ static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
 		return -EINVAL;
 	}
 
-	if (!isxdigit(*buf)) {
-		pr_err("%s: isxdigit fail\n", __func__);
+	if (!isxdigit(*buf))
 		return count;
-	}
 
 	if (fuse_odm_prod_mode()) {
 		pr_err("%s: device locked. odm fuse already blown\n", __func__);
@@ -684,7 +683,7 @@ static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	count--;
 	if (DIV_ROUND_UP(count, 2) > fuse_info_tbl[param].sz) {
-		pr_err("%s: fuse parameter too long, should be %d bytes\n",
+		pr_err("%s: fuse parameter too long, should be %d character(s)\n",
 			__func__, fuse_info_tbl[param].sz * 2);
 		return -EINVAL;
 	}
@@ -693,17 +692,13 @@ static ssize_t fuse_store(struct kobject *kobj, struct kobj_attribute *attr,
 	wake_lock_init(&fuse_wk_lock, WAKE_LOCK_SUSPEND, "fuse_wk_lock");
 	wake_lock(&fuse_wk_lock);
 
-	raw_data += (count / CHARS_PER_WORD);
-	*raw_data = 0;
-	while (isxdigit(*buf)) {
-		*raw_data <<= 4;
-		*raw_data += char_to_xdigit(*buf);
+	raw_byte_data += DIV_ROUND_UP(count, 2) - 1;
+	for (i = 0; i < DIV_ROUND_UP(count, 2); i++, buf++) {
+		*raw_byte_data = char_to_xdigit(*buf);
+		*raw_byte_data <<= 4;
 		buf++;
-		if (++i == 8) {
-			raw_data--;
-			*raw_data = 0;
-			i = 0;
-		}
+		*raw_byte_data |= (char_to_xdigit(*buf) & 0xF);
+		raw_byte_data--;
 	}
 
 	ret = tegra_fuse_program(&data, BIT(param));
@@ -757,7 +752,7 @@ static ssize_t fuse_show(struct kobject *kobj, struct kobj_attribute *attr, char
 	}
 
 	strcpy(buf, "");
-	for (i = 0; i < (fuse_info_tbl[param].sz/sizeof(u32)) ; i++) {
+	for (i = (fuse_info_tbl[param].sz/sizeof(u32)) - 1; i >= 0 ; i--) {
 		sprintf(str, "%08x", data[i]);
 		strcat(buf, str);
 	}
