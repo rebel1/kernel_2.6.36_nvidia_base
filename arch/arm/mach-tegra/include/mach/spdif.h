@@ -393,7 +393,7 @@ struct spdif_regs_cache {
 	int spdif_ctrl_0;
 	int spdif_status_0;
 	int spdif_strobe_ctrl_0;
-	int spdif_data_fifo_scr_0;
+	int spdif_data_fifo_csr_0;
 	int spdif_ch_sta_rx_a_0;
 	int spdif_ch_sta_rx_b_0;
 	int spdif_ch_sta_rx_c_0;
@@ -429,5 +429,6 @@ u32 spdif_get_fifo_full_empty_count(unsigned long base, int mode);
 int spdif_initialize(unsigned long base, int mode);
 void spdif_get_all_regs(unsigned long base, struct spdif_regs_cache* regs);
 void spdif_set_all_regs(unsigned long base, struct spdif_regs_cache* regs);
+void spdif_dump_registers(unsigned long base, struct spdif_regs_cache* regs);
 
 #endif /* __ARCH_ARM_MACH_TEGRA_SPDIF_H */
