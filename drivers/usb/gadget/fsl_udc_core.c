@@ -1216,9 +1216,9 @@ static int fsl_vbus_session(struct usb_gadget *gadget, int is_active)
 			udc->vbus_active = 0;
 			udc->usb_state = USB_STATE_DEFAULT;
 			spin_unlock_irqrestore(&udc->lock, flags);
-			fsl_udc_clk_suspend();
+			fsl_udc_clk_suspend(false);
 		} else if (!udc->vbus_active && is_active) {
-			fsl_udc_clk_resume();
+			fsl_udc_clk_resume(false);
 			/* setup the controller in the device mode */
 			dr_controller_setup(udc);
 			/* setup EP0 for setup packet */
@@ -2751,7 +2751,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	if (udc_controller->transceiver) {
 		dr_controller_stop(udc_controller);
 		dr_controller_reset(udc_controller);
-		fsl_udc_clk_suspend();
+		fsl_udc_clk_suspend(false);
 		udc_controller->vbus_active = 0;
 		udc_controller->usb_state = USB_STATE_DEFAULT;
 		otg_set_peripheral(udc_controller->transceiver, &udc_controller->gadget);
@@ -2760,7 +2760,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 #ifdef CONFIG_ARCH_TEGRA
 	/* Power down the phy if cable is not connected */
 	if (!(fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS))
-		fsl_udc_clk_suspend();
+		fsl_udc_clk_suspend(false);
 #endif
 #endif
 
@@ -2847,7 +2847,7 @@ static int fsl_udc_suspend(struct platform_device *pdev, pm_message_t state)
     if (udc_controller->transceiver) {
         udc_controller->transceiver->state = OTG_STATE_UNDEFINED;
     }
-    fsl_udc_clk_suspend();
+    fsl_udc_clk_suspend(true);
     return 0;
 }
 
@@ -2868,13 +2868,13 @@ static int fsl_udc_resume(struct platform_device *pdev)
             /* if there is no VBUS then power down the clocks and return */
             return 0;
         } else {
-		fsl_udc_clk_resume();
+		fsl_udc_clk_resume(true);
             /* Detected VBUS set the transceiver state to device mode */
             udc_controller->transceiver->state = OTG_STATE_B_PERIPHERAL;
         }
     } else {
         /* enable the clocks to the controller */
-        fsl_udc_clk_resume();
+        fsl_udc_clk_resume(true);
     }
 
 #if defined(CONFIG_ARCH_TEGRA)
@@ -2891,7 +2891,7 @@ static int fsl_udc_resume(struct platform_device *pdev)
 #endif
     /* Power down the phy if cable is not connected */
     if (!(fsl_readl(&usb_sys_regs->vbus_wakeup) & USB_SYS_VBUS_STATUS))
-        fsl_udc_clk_suspend();
+        fsl_udc_clk_suspend(false);
 
     return 0;
 }
