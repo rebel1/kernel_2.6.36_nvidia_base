@@ -84,6 +84,7 @@ struct tegra_xtal_freq;
 
 struct tegra_usb_phy {
 	int instance;
+	bool initialized;
 	const struct tegra_xtal_freq *freq;
 	void __iomem *regs;
 	void __iomem *pad_regs;
