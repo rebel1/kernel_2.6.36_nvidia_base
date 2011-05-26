@@ -1224,7 +1224,8 @@ void tegra_usb_phy_power_off(struct tegra_usb_phy *phy, bool is_dpd)
 	} else
 		utmi_phy_power_off(phy, is_dpd);
 
-	if (phy->regulator_on && (tegra_get_revision() >= TEGRA_REVISION_A03)) {
+	if (phy->regulator_on && (tegra_get_revision() >= TEGRA_REVISION_A03)
+		&& is_dpd) {
 		regulator_disable(phy->reg_vdd);
 		phy->regulator_on = 0;
 	}
