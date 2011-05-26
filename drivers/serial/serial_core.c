@@ -1493,10 +1493,8 @@ static void uart_update_termios(struct tty_struct *tty,
 {
 	struct uart_port *port = state->uart_port;
 
-	if (uart_console(port) && port->cons->cflag) {
+	if (uart_console(port) && port->cons->cflag)
 		tty->termios->c_cflag = port->cons->cflag;
-		port->cons->cflag = 0;
-	}
 
 	/*
 	 * If the device failed to grab its irq resources,
