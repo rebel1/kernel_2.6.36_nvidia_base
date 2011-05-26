@@ -178,6 +178,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
 	.clk_id = NULL,
 	.force_hs = 0,
 	.cd_gpio = WHISTLER_EXT_SDCARD_DETECT,
+	.cd_gpio_polarity = 0,
 	.wp_gpio = -1,
 	.power_gpio = -1,
 };
