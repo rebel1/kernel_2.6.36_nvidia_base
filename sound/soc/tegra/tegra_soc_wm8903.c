@@ -24,6 +24,7 @@
 
 static struct platform_device *tegra_snd_device;
 
+static struct regulator *reg_vmic = NULL;
 extern int en_dmic;
 
 extern struct snd_soc_dai tegra_i2s_dai[];
@@ -294,12 +295,26 @@ int tegra_codec_startup(struct snd_pcm_substream *substream)
 {
 	tegra_das_power_mode(true);
 
+	if ((SNDRV_PCM_STREAM_CAPTURE == substream->stream) && en_dmic) {
+		/* enable d-mic */
+		if (reg_vmic) {
+			regulator_enable(reg_vmic);
+		}
+	}
+
 	return 0;
 }
 
 void tegra_codec_shutdown(struct snd_pcm_substream *substream)
 {
 	tegra_das_power_mode(false);
+
+	if ((SNDRV_PCM_STREAM_CAPTURE == substream->stream) && en_dmic) {
+		/* disable d-mic */
+		if (reg_vmic) {
+			regulator_disable(reg_vmic);
+		}
+	}
 }
 
 int tegra_soc_suspend_pre(struct platform_device *pdev, pm_message_t state)
@@ -619,7 +634,13 @@ static int __init tegra_init(void)
 		dev_err(&tegra_snd_device->dev,
 				"%s: could not create sysfs entry %s: %d\n",
 				__func__, dev_attr_enable_digital_mic.attr.name, ret);
-		return ret;
+		goto fail;
+	}
+
+	reg_vmic = regulator_get(&tegra_snd_device->dev, "vmic");
+	if (IS_ERR_OR_NULL(reg_vmic)) {
+		pr_err("Couldn't get vmic regulator\n");
+		reg_vmic = NULL;
 	}
 
 	return 0;
@@ -636,6 +657,10 @@ fail:
 static void __exit tegra_exit(void)
 {
 	tegra_jack_exit();
+	if (reg_vmic) {
+		regulator_put(reg_vmic);
+		reg_vmic = NULL;
+	}
 	platform_device_unregister(tegra_snd_device);
 }
 
