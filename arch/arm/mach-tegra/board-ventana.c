@@ -237,6 +237,7 @@ static __initdata struct tegra_clk_init_table ventana_clk_init_table[] = {
 	{ "pwm",	"clk_32k",	32768,		false},
 	{ "pll_a",	NULL,		56448000,	false},
 	{ "pll_a_out0",	NULL,		11289600,	false},
+	{ "clk_dev1",	"pll_a_out0",	0,		true},
 	{ "i2s1",	"pll_a_out0",	11289600,	false},
 	{ "i2s2",	"pll_a_out0",	11289600,	false},
 	{ "audio",	"pll_a_out0",	11289600,	false},
