@@ -81,6 +81,7 @@ static void tegra_ehci_power_down(struct usb_hcd *hcd, bool is_dpd)
 static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 {
 	struct ehci_hcd *ehci = hcd_to_ehci (hcd);
+	struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
 	struct ehci_regs __iomem *hw = ehci->regs;
 	u32 val;
 
@@ -97,8 +98,13 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 		val = readl(&hw->status);
 		if (!(val  & STS_PCD)) {
 			spin_unlock (&ehci->lock);
-			return 0;
+			return IRQ_NONE;
 		}
+	}
+	/* we would lock if we went further without power */
+	if (!tegra->host_resumed) {
+		spin_unlock (&ehci->lock);
+		return IRQ_HANDLED;
 	}
 	spin_unlock (&ehci->lock);
 	return ehci_irq(hcd);
