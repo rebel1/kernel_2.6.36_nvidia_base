@@ -1076,7 +1076,8 @@ static irqreturn_t usb_phy_vbus_irq_thr(int irq, void *pdata)
 }
 
 struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
-			void *config, enum tegra_usb_phy_mode phy_mode)
+			void *config, enum tegra_usb_phy_mode phy_mode,
+			enum tegra_usb_phy_type usb_phy_type)
 {
 	struct tegra_usb_phy *phy;
 	struct tegra_ulpi_config *ulpi_config;
@@ -1094,6 +1095,7 @@ struct tegra_usb_phy *tegra_usb_phy_open(int instance, void __iomem *regs,
 	phy->config = config;
 	phy->mode = phy_mode;
 	phy->regulator_on = 0;
+	phy->usb_phy_type = usb_phy_type;
 
 	if (!phy->config) {
 		if (phy_is_ulpi(phy)) {
