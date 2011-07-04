@@ -600,13 +600,9 @@ static struct platform_device tegra_camera = {
 };
 
 static struct platform_device *ventana_devices[] __initdata = {
-	&tegra_usb_fsg_device,
-	&androidusb_device,
 	&tegra_uartb_device,
 	&tegra_uartc_device,
 	&pmu_device,
-	&tegra_udc_device,
-	&tegra_ehci2_device,
 	&tegra_gart_device,
 	&tegra_aes_device,
 #ifdef CONFIG_KEYBOARD_GPIO
@@ -821,9 +817,14 @@ static void ventana_usb_init(void)
 	int i;
 
 	tegra_usb_phy_init(tegra_usb_phy_pdata, ARRAY_SIZE(tegra_usb_phy_pdata));
-
+	/* OTG should be the first to be registered */
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 	platform_device_register(&tegra_otg_device);
+
+	platform_device_register(&tegra_usb_fsg_device);
+	platform_device_register(&androidusb_device);
+	platform_device_register(&tegra_udc_device);
+	platform_device_register(&tegra_ehci2_device);
 
 	tegra_ehci3_device.dev.platform_data=&tegra_ehci_pdata[2];
 	platform_device_register(&tegra_ehci3_device);
