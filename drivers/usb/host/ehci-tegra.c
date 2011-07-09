@@ -86,7 +86,7 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 	u32 val;
 
 	if (tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) {
-		spin_lock (&ehci->lock);
+		spin_lock(&ehci->lock);
 		val = readl(hcd->regs + TEGRA_USB_SUSP_CTRL_OFFSET);
 		if ((val  & TEGRA_USB_PHY_CLK_VALID_INT_STS)) {
 			val &= ~TEGRA_USB_PHY_CLK_VALID_INT_ENB | TEGRA_USB_PHY_CLK_VALID_INT_STS;
@@ -98,14 +98,9 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 
 			val = readl(&hw->status);
 			if (!(val  & STS_PCD)) {
-				spin_unlock (&ehci->lock);
+				spin_unlock(&ehci->lock);
 				return IRQ_NONE;
 			}
-		}
-		/* we would lock if we went further without power */
-		if (!tegra->host_resumed) {
-			spin_unlock (&ehci->lock);
-			return IRQ_HANDLED;
 		}
 		spin_unlock (&ehci->lock);
 	}
