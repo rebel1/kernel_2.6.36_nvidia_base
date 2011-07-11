@@ -93,7 +93,7 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 			writel(val , (hcd->regs + TEGRA_USB_SUSP_CTRL_OFFSET));
 
 			val = readl(hcd->regs + TEGRA_USB_PORTSC1_OFFSET);
-			val &= ~TEGRA_USB_PORTSC1_WKCN;
+			val &= ~(TEGRA_USB_PORTSC1_WKCN | PORT_CSC | PORT_PEC | PORT_OCC);
 			writel(val , (hcd->regs + TEGRA_USB_PORTSC1_OFFSET));
 
 			val = readl(&hw->status);
