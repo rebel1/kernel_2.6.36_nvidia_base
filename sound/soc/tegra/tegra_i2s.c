@@ -325,7 +325,6 @@ int tegra_i2s_resume(struct snd_soc_dai *cpu_dai)
 
 	tegra_das_set_all_regs(&info->das_regs);
 	i2s_set_all_regs(cpu_dai->id, &info->i2s_regs);
-	tegra_jack_resume();
 
 	clk_disable(info->i2s_clk);
 

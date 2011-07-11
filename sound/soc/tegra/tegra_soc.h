@@ -134,6 +134,7 @@ int tegra_controls_init(struct snd_soc_codec *codec);
 
 int tegra_jack_init(struct snd_soc_codec *codec);
 void tegra_jack_exit(void);
+void tegra_jack_suspend(void);
 void tegra_jack_resume(void);
 void tegra_switch_set_state(int state);
 
