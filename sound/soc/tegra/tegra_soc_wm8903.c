@@ -434,6 +434,11 @@ static int tegra_dapm_event_int_spk(struct snd_soc_dapm_widget* w,
 
 		gpio_set_value_cansleep(tegra_wired_jack_conf.en_spkr,
 			SND_SOC_DAPM_EVENT_ON(event) ? 1 : 0);
+
+		/* the amplifier needs 100ms to enable. wait 100ms after
+		 * gpio EN triggered */
+		if (SND_SOC_DAPM_EVENT_ON(event))
+			msleep(100);
 	}
 
 	return 0;
