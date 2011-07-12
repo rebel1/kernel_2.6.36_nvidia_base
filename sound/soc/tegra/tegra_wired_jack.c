@@ -130,20 +130,16 @@ static int wired_switch_notify(struct notifier_block *self,
 
 void tegra_jack_suspend(void)
 {
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(wired_jack_gpios); i++)
-		disable_irq(gpio_to_irq(wired_jack_gpios[i].gpio));
+	snd_soc_jack_free_gpios(tegra_wired_jack,
+				ARRAY_SIZE(wired_jack_gpios),
+				wired_jack_gpios);
 }
 
 void tegra_jack_resume(void)
 {
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(wired_jack_gpios); i++)
-		enable_irq(gpio_to_irq(wired_jack_gpios[i].gpio));
-
-	tegra_switch_set_state(get_headset_state());
+	snd_soc_jack_add_gpios(tegra_wired_jack,
+				     ARRAY_SIZE(wired_jack_gpios),
+				     wired_jack_gpios);
 }
 
 static struct notifier_block wired_switch_nb = {
