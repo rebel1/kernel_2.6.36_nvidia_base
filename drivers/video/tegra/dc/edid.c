@@ -170,6 +170,7 @@ int tegra_edid_parse_ext_block(u8 *raw, int idx, struct tegra_edid *edid)
 	u8 code;
 	int len;
 	int i;
+	bool basic_audio = false;
 
 	ptr = &raw[0];
 
@@ -184,7 +185,7 @@ int tegra_edid_parse_ext_block(u8 *raw, int idx, struct tegra_edid *edid)
 			/* For basic audio, set spk_alloc to Left+Right.
 			 * If there is a Speaker Alloc block this will
 			 * get over written with that value */
-			edid->eld.spk_alloc = 1;
+			basic_audio = true;
 		}
 	}
 	ptr = &raw[4];
@@ -210,6 +211,9 @@ int tegra_edid_parse_ext_block(u8 *raw, int idx, struct tegra_edid *edid)
 				edid->eld.sad[i] = ptr[i + 1];
 			len++;
 			ptr += len; /* adding the header */
+			/* Got an audio data block so enable audio */
+			if(basic_audio == true)
+				edid->eld.spk_alloc = 1;
 			break;
 		}
 		/* case 2 is commented out for now */
