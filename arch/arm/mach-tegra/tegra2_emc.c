@@ -16,6 +16,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/delay.h>
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/io.h>
@@ -129,6 +130,61 @@ static const unsigned long emc_reg_addr[TEGRA_EMC_NUM_REGS] = {
 	0x2d8,	/* CFG_CLKTRIM_2 */
 };
 
+
+#define EMC_CFG_2_0   				0x2b8
+#define EMC_FBIO_CFG5_0     		0x104
+#define EMC_MRW_0           		0x0e8
+#define EMC_MRS_0           		0x0cc
+
+#define NVRM_CLOCK_CHANGE_DELAY     2
+
+/* Configures the clock change mechanism of tegra */
+static void tegra_emc_config_clk_change(void)
+{
+
+	/* NO-DEVICE for dummy MRW/MRS commands */
+#	define NULL_DEV_SELECTN (3)
+
+    u32 cfg2, cfg5;
+
+    cfg2 = emc_readl(EMC_CFG_2_0);
+    cfg5 = emc_readl(EMC_FBIO_CFG5_0);
+
+	/* Based on dram type being used */
+    switch (cfg5 & 3)
+    {
+        case 2: /* LPDDR2 */
+
+            // Dummy mode control command to activate PD state machine
+            emc_writel(EMC_MRW_0, NULL_DEV_SELECTN << 30);
+					
+            udelay(NVRM_CLOCK_CHANGE_DELAY);
+
+			cfg2 |=  0x00000002; 	/* Forces dram into power-down during CLKCHANGE. */
+			cfg2 &= ~0x00000004;	/* Disables forcing dram into self-refresh during CLKCHANGE. */
+            break;
+
+        case 3: /* DDR2 */
+
+            // Dummy mode control command to activate PD state machine
+            emc_writel(EMC_MRS_0, NULL_DEV_SELECTN << 30);
+			
+            udelay(NVRM_CLOCK_CHANGE_DELAY);
+
+			cfg2 &= ~0x00000002; 	/* Disables forcing dram into power-down during CLKCHANGE. */
+			cfg2 |=  0x00000004;	/* Forces dram into self-refresh during CLKCHANGE. */
+            break;
+			
+        default:
+            /* "Not supported DRAM type" */
+            return;
+    }
+	
+    cfg2 |= 0x00000001; /* allows EMC and CAR to handshake on PLL divider/source changes. */
+    emc_writel(EMC_CFG_2_0, cfg2);
+}
+
+
 /* Select the closest EMC rate that is higher than the requested rate */
 long tegra_emc_round_rate(unsigned long rate)
 {
@@ -236,10 +292,15 @@ void tegra_init_emc(const struct tegra_emc_chip *chips, int chips_size)
 	}
 
 	if (chip_matched >= 0) {
+	
 		pr_info("%s: %s memory found\n", __func__,
 			chips[chip_matched].description);
 		tegra_emc_table = chips[chip_matched].table;
 		tegra_emc_table_size = chips[chip_matched].table_size;
+		
+		/* configure the clock change mechanism of tegra */
+		tegra_emc_config_clk_change();
+		
 	} else {
 		pr_err("%s: Memory not recognized, memory scaling disabled\n",
 			__func__);

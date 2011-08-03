@@ -45,6 +45,14 @@ config REGULATOR_FIXED_VOLTAGE
 	  useful for systems which use a combination of software
 	  managed regulators and simple non-configurable regulators.
 
+config REGULATOR_VIRTUAL_ADJ_VOLTAGE
+	tristate "Virtual variable voltage regulator support"
+	help
+	  This driver provides support for virtual variable voltage 
+	  regulators, useful for drivers that need them, when there is
+	  no real need.
+
+	  
 config REGULATOR_VIRTUAL_CONSUMER
 	tristate "Virtual regulator consumer support"
 	help

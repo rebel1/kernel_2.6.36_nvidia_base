@@ -333,6 +333,17 @@ config MFD_WM831X
 	  additional drivers must be enabled in order to use the
 	  functionality of the device.
 
+config MFD_NVEC
+	bool "Support for NVidia Embedded controller"
+	select MFD_CORE
+	depends on MACH_SHUTTLE || MACH_BETELGEUSE
+	help
+	  Support for the NVidia embedded controller used on several
+	  Tegra2 based boards. 
+	  This driver provides common support for accessing the device,
+	  additional drivers must be enabled in order to use the
+	  functionality of the device.
+
 config MFD_WM8350
 	bool
 	depends on GENERIC_HARDIRQS

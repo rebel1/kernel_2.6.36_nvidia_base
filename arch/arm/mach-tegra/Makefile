@@ -14,7 +14,7 @@ obj-y                                   += powergate.o
 obj-y                                   += suspend.o
 obj-y                                   += fuse.o
 obj-y                                   += kfuse.o
-ifeq ($(CONFIG_TEGRA_ALSA),y)
+ifeq ($(CONFIG_SND_TEGRA_SOC),y)
 obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_i2s.o
 else
 obj-y                                   += tegra_i2s_audio.o
@@ -51,14 +51,44 @@ obj-$(CONFIG_TEGRA_IOVMM)               += iovmm.o
 obj-$(CONFIG_TEGRA_IOVMM_GART)          += iovmm-gart.o
 obj-$(CONFIG_TEGRA_MC_PROFILE)          += tegra2_mc.o
 
-obj-y                                   += nv/
-
 obj-${CONFIG_TEGRA_SPI_SLAVE}		+= spi_tegra_slave.o
 
 obj-${CONFIG_MACH_HARMONY}              += board-harmony.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-pinmux.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-panel.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-sdhci.o
+
+# Shuttle arch drivers
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-aes.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-audio.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-bootinfo.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-bt.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-camera.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-clocks.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-gps.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-gpu.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-gsm.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-i2c.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-keyboard.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-memory.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-nand.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-pinmux.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-power.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-sdhci.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-sensors.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-spi.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-touch.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-uart.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-usb.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-wdt.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle-wlan.o
+obj-${CONFIG_MACH_SHUTTLE}              += board-shuttle.o
+# Shuttle power management drivers
+obj-${CONFIG_MACH_SHUTTLE}              += shuttle-pm-bluetooth.o
+obj-${CONFIG_MACH_SHUTTLE}              += shuttle-pm-camera.o
+obj-${CONFIG_MACH_SHUTTLE}              += shuttle-pm-gps.o
+obj-${CONFIG_MACH_SHUTTLE}              += shuttle-pm-gsm.o
+obj-${CONFIG_MACH_SHUTTLE}              += shuttle-pm-wlan.o
 
 obj-${CONFIG_MACH_VENTANA}              += board-ventana.o
 obj-${CONFIG_MACH_VENTANA}              += board-ventana-pinmux.o
