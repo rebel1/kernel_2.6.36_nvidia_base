@@ -51,7 +51,8 @@ static int use_dynamic_emc = 1;
 
 module_param_named(use_dynamic_emc, use_dynamic_emc, int, S_IRUGO | S_IWUSR);
 
-static int windows_idle_detection_time = 0;
+/* set default windows idle time as 2000ms for power saving purpose */
+static int windows_idle_detection_time = 2000;
 
 module_param_named(windows_idle_detection_time, windows_idle_detection_time,
 		   int, S_IRUGO | S_IWUSR);
