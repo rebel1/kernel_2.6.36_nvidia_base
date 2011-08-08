@@ -151,8 +151,8 @@ static __initdata struct tegra_clk_init_table shuttle_clk_init_table[] = {
 
 	/* pll_x */
 	{ "pll_x",  	"clk_m",        760000000,  true},		/* */
-	{ "cclk",		"pll_x"			760000000,  true},	
-	{ "cpu",		"cclk"			760000000,  true},	
+	{ "cclk",	"pll_x",	760000000,  true},	
+	{ "cpu",	"cclk",		760000000,  true},	
 	
 	
 	/* Peripherals - Always on */
