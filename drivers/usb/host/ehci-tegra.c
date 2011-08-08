@@ -85,7 +85,7 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 	struct ehci_regs __iomem *hw = ehci->regs;
 	u32 val;
 
-	if (tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) {
+	if (tegra->phy->instance == 2) {
 		spin_lock(&ehci->lock);
 		val = readl(hcd->regs + TEGRA_USB_SUSP_CTRL_OFFSET);
 		if ((val  & TEGRA_USB_PHY_CLK_VALID_INT_STS)) {
