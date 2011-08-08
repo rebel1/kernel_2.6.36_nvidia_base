@@ -51,6 +51,8 @@ obj-$(CONFIG_TEGRA_IOVMM)               += iovmm.o
 obj-$(CONFIG_TEGRA_IOVMM_GART)          += iovmm-gart.o
 obj-$(CONFIG_TEGRA_MC_PROFILE)          += tegra2_mc.o
 
+obj-y                                   += nv/
+
 obj-${CONFIG_TEGRA_SPI_SLAVE}		+= spi_tegra_slave.o
 
 obj-${CONFIG_MACH_HARMONY}              += board-harmony.o

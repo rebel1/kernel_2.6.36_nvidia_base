@@ -20,6 +20,9 @@
  */
 #include <linux/i2c.h>
 #include <linux/version.h>
+#include <linux/delay.h>
+#include <linux/reboot.h>
+#include <linux/console.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <linux/regulator/virtual_adj.h>
@@ -39,6 +42,7 @@
 #include <mach/irqs.h>
 #include <mach/iomap.h>
 #include <mach/gpio.h>
+#include <mach/system.h>
 
 #include "board-shuttle.h"
 #include "gpio-names.h"
@@ -523,6 +527,126 @@ static void shuttle_power_off(void)
 	}
 }
 
+static void reg_on(const char *reg)
+{
+	int rc;
+	struct regulator *regulator;
+
+	regulator = regulator_get(NULL, reg);
+
+	if (IS_ERR(regulator)) {
+		pr_err("%s: regulator_get returned %ld\n", __func__,
+		       PTR_ERR(regulator));
+		return;
+	}
+
+	/* enable the regulator */
+	rc = regulator_enable(regulator);
+	if (rc)
+		pr_err("%s: regulator_enable returned %d\n", __func__, rc);
+	regulator_put(regulator);
+}
+
+#if 1
+
+static void tegra_sys_reset(char mode, const char *cmd)
+{
+	/* use *_related to avoid spinlock since caches are off */
+	u32 reg;
+	void __iomem *car_reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
+	void __iomem *sys_reset = IO_ADDRESS(TEGRA_PMC_BASE + 0x00);
+	
+	/* CAR reset */
+	reg = readl_relaxed(car_reset);
+	reg |= 0x04;
+	writel_relaxed(reg, car_reset);
+
+	/* System reset */
+	reg = readl_relaxed(sys_reset);
+	reg |= 0x10;
+	writel_relaxed(reg, sys_reset);
+	
+}
+#endif
+
+#if 0 
+static bool console_flushed;
+static void shuttle_flush_console(void)
+{
+	if (console_flushed)
+		return;
+	console_flushed = true;
+
+	printk("\n");
+	pr_emerg("Restarting %s\n", linux_banner);
+	if (!try_acquire_console_sem()) {
+		release_console_sem();
+		return;
+	}
+
+	mdelay(50);
+
+	local_irq_disable();
+	if (try_acquire_console_sem())
+		pr_emerg("tegra_restart: Console was locked! Busting\n");
+	else
+		pr_emerg("tegra_restart: Console was locked!\n");
+	release_console_sem();
+}
+
+static void shuttle_restart(char mode, const char *cmd)
+{
+	/* USB power rail must be enabled during boot or we won't reboot*/
+	reg_on("avdd_usb");
+
+	/* Prepare to restart using NvEC */
+	nvec_restart();
+	
+	/* Flush the console */
+	shuttle_flush_console();
+	
+	/* Restart the machine - This will eventually pulse the reset line */
+	arm_machine_restart(mode, cmd);
+}
+#endif
+
+static int tegra_reboot_notify(struct notifier_block *nb,
+				unsigned long event, void *data)
+{
+	switch (event) {
+	case SYS_RESTART:
+	case SYS_HALT:
+	case SYS_POWER_OFF:
+		/* USB power rail must be enabled during boot or we won't reboot*/
+		reg_on("avdd_usb");
+
+		return NOTIFY_OK;
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block tegra_reboot_nb = {
+	.notifier_call = tegra_reboot_notify,
+	.next = NULL,
+	.priority = 0
+};
+
+
+static void __init tegra_setup_reboot(void)
+{
+
+	int rc = register_reboot_notifier(&tegra_reboot_nb);
+	if (rc)
+		pr_err("%s: failed to register platform reboot notifier\n",
+			__func__);
+	/*arm_pm_restart = shuttle_restart;		*/
+
+	tegra_reset = tegra_sys_reset;
+
+} 
+
+
+
 #if LINUX_VERSION_CODE == KERNEL_VERSION(2,6,39) || LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38)
 /* missing from defines ... remove ASAP when defined in devices.c */
 static struct resource tegra_rtc_resources[] = {
@@ -577,6 +701,9 @@ int __init shuttle_power_register_devices(void)
 
 	/* register the poweroff callback */
 	pm_power_off = shuttle_power_off;		
+	
+	/* And the restart callback */
+	tegra_setup_reboot();
 
 	/* signal that power regulators have fully specified constraints */
 	regulator_has_full_constraints();

@@ -41,7 +41,7 @@
 
 /* Make sure they are NOT trying to compile with a nonworking config */
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
-#error  DISABLE MMC EMBEDDED SDIO, or WLAN won't work amd SD Cards could stop responding...
+#error  DISABLE MMC EMBEDDED SDIO, or WLAN wont work amd SD Cards could stop responding...
 #endif
 
 static void (*wlan_status_cb)(int card_present, void *dev_id) = NULL;

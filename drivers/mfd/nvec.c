@@ -1213,6 +1213,7 @@ int nvec_cmd_xfer(struct device* dev, int cmd,int subcmd,
 EXPORT_SYMBOL(nvec_cmd_xfer);
 
 struct nvec_chip* g_nvec = NULL;
+
 /* Power down by using NvEC */
 void nvec_poweroff(void)
 {
@@ -1225,9 +1226,29 @@ void nvec_poweroff(void)
 		nvec_cmd_xfer(g_nvec->dev,
 			NVEC_CMD_SLEEP, NVEC_CMD_SLEEP_APPOWERDOWN,
 			NULL,0,NULL,0);
+	} else {
+		pr_emerg("NvEC not initialized. Unable to shutdown\n");
 	}
 }
 EXPORT_SYMBOL(nvec_poweroff);
+
+/* Restart by using NvEC */
+void nvec_restart(void)
+{
+	if (g_nvec != NULL) {
+	
+		/* Disable event reporting */
+		nvec_disable_eventreporting(g_nvec);
+		
+		/* Send the command to restart AP */
+		nvec_cmd_xfer(g_nvec->dev,
+			NVEC_CMD_SLEEP, NVEC_CMD_SLEEP_APRESTART,
+			NULL,0,NULL,0);
+	} else {
+		pr_emerg("NvEC not initialized. Unable to restart\n");
+	}
+}
+EXPORT_SYMBOL(nvec_restart);
 
 static int __remove_subdev(struct device *dev, void *unused)
 {
@@ -1347,8 +1368,8 @@ static int __devinit tegra_nvec_probe(struct platform_device *pdev)
 	/* Enable the i2c slave */
 	tegra_enable_i2c_slave(nvec);	
 
-	/* Probe that the NvEC is present by querying the 
-	   Firmware Version */
+	/* Try to query for fw version. Not all NVEC firmwares support it, so
+	   do not use it as a proof of nvec existance */
 	{
 		struct NVEC_ANS_CONTROL_GETFIRMWAREVERSION_PAYLOAD fwVer = {
 			.VersionMajor = {0,0},
@@ -1362,21 +1383,17 @@ static int __devinit tegra_nvec_probe(struct platform_device *pdev)
 				
 		/* We verify success, not size, as there are firmwares out there that
 		   respond with less bytes than expected */
-		/*if (ret < 0) {
-			dev_err(nvec->dev, "NvEC not found\n");
-			goto failed3; 
-		} */ 
-
-		dev_info(nvec->dev, "Nvidia Embedded controller driver loaded\n");
-		dev_info(nvec->dev, "Firmware version %02x.%02x.%02x / %02x\n",
-				fwVer.VersionMajor[1],fwVer.VersionMajor[0],
-				fwVer.VersionMinor[1],fwVer.VersionMinor[0]);
+		if (ret >= 0) {
+			dev_info(nvec->dev, "Firmware version %02x.%02x.%02x / %02x\n",
+					fwVer.VersionMajor[1],fwVer.VersionMajor[0],
+					fwVer.VersionMinor[1],fwVer.VersionMinor[0]);
+		}
 	}
 
-	/* Enable event reporting */
+	/* Enable event reporting - If this is not supported, then NvEC is not there*/
 	ret = nvec_enable_eventreporting(nvec);
 	if (ret < 0) {
-		dev_err(nvec->dev, "error enabling event reporting\n");
+		dev_err(nvec->dev, "NvEC not found\n");
 		goto failed3;
 	}
 
@@ -1399,6 +1416,8 @@ static int __devinit tegra_nvec_probe(struct platform_device *pdev)
 	/* Keep a pointer to the nvec chip structure */
 	g_nvec = nvec;
 
+	dev_info(nvec->dev, "Nvidia Embedded controller driver loaded\n");	
+	
 	return 0;
 
 failed3: 

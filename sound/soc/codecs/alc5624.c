@@ -543,6 +543,7 @@ struct alc5624_priv {
 	struct clk* 	mclk;			/* the master clock */
 	unsigned int	spkvdd_mv;		/* Speaker Vdd in millivolts */
 	unsigned int	hpvdd_mv;		/* Headphone Vdd in millivolts */
+	unsigned int	spkvol_scale;	/* Speaker volume scaling: Reduces volume range to the percent specified */
 	
 	enum snd_soc_control_type control_type;
 	void *			control_data;
@@ -642,6 +643,7 @@ static const unsigned int micboost_tlv[] = {
 	2, 2, TLV_DB_SCALE_ITEM(3000, 0, 0),
 	3, 3, TLV_DB_SCALE_ITEM(4000, 0, 0),
 };
+
 
 /* Before modifying control names, please think it twice... Names are very important
    for DAPM to deduce topology and propagate power events */
@@ -1532,6 +1534,34 @@ static int alc5624_hw_write(void* control_data,const char* data_in_s,int len)
 	struct alc5624_priv *alc5624 = control_data;
 	u8* data_in = (u8*)data_in_s;
 	
+	/* If dealing with the main volume, scale it as requested */
+	if (data_in[0] == ALC5624_SPK_OUT_VOL) {
+	
+		/* write the volume to the hw regs */
+		unsigned int voll,volr;
+		u8 data[3];
+		
+		/* Get left and right volumes */
+		voll = (data_in[1] & 0x1F); /* hi */
+		volr = (data_in[2] & 0x1F); /* lo */
+		
+		/* Scale them */
+		voll = voll * alc5624->spkvol_scale / 100;
+		volr = volr * alc5624->spkvol_scale / 100;
+		
+		/* Limit values */
+		if (voll > 0x1F) voll = 0x1F;
+		if (volr > 0x1F) volr = 0x1F;
+		
+		/* Recreate the value */
+		data[0] = ALC5624_SPK_OUT_VOL;
+		data[1] = (data_in[1] & 0xE0) | voll;
+		data[2] = (data_in[2] & 0xE0) | volr;
+
+		/* And write the main speaker volume */
+		return alc5624->bus_hw_write(alc5624->bus_control_data,data,3);
+	}
+	
 	/* If it is a real register, call the original bus access function */
 	if (data_in[0] <= ALC5624_VENDOR_ID2)
 		return alc5624->bus_hw_write(alc5624->bus_control_data,data_in_s,len);
@@ -1808,6 +1838,38 @@ static unsigned int alc5624_hw_read(struct snd_soc_codec *codec,
 	unsigned int reg)
 {
 	struct alc5624_priv *alc5624 = snd_soc_codec_get_drvdata(codec);
+	
+	/* If dealing with the main volume, scale it as requested */
+	if (reg == ALC5624_SPK_OUT_VOL) {
+	
+		/* Read the volume from the hw regs */
+		unsigned int reg2v,voll,volr;
+	
+		/* bus_hw_read expects that codec->control_data is pointing to 
+		   the original control_data.That is the only field accessed. Create
+		   a temporary struct with the required data */
+		struct snd_soc_codec tmpcodec;
+		tmpcodec.control_data = alc5624->bus_control_data;
+		reg2v = alc5624->bus_hw_read(&tmpcodec,reg);
+	
+		/* Get left and right volumes */
+		voll = (reg2v & 0x1F00) >> 8;
+		volr = (reg2v & 0x001F);
+		
+		/* Inverse scale them */
+		voll = voll * 100 / alc5624->spkvol_scale;
+		volr = volr * 100 / alc5624->spkvol_scale;
+		
+		/* Limit values */
+		if (voll > 0x1F) voll = 0x1F;
+		if (volr > 0x1F) volr = 0x1F;
+		
+		/* Recreate the value */
+		reg2v = (reg2v & 0xE0E0) | (volr) | (voll << 8);
+		
+		/* And return the inversely scaled volume */
+		return reg2v;
+	}
 	
 	/* If it is a real register, call the original bus access function */
 	if (reg <= ALC5624_VENDOR_ID2) {
@@ -2116,6 +2178,7 @@ static __devinit int alc5624_i2c_probe(struct i2c_client *client,
 	/* Store the supply voltages used for amplifiers */
 	alc5624->spkvdd_mv = pdata->spkvdd_mv;	/* Speaker Vdd in millivolts */
 	alc5624->hpvdd_mv  = pdata->hpvdd_mv;	/* Headphone Vdd in millivolts */
+	alc5624->spkvol_scale = pdata->spkvol_scale ? pdata->spkvol_scale : 100; /* store maximum volume scale */
 
 	i2c_set_clientdata(client, alc5624);
 	alc5624->control_data = client;

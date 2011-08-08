@@ -68,6 +68,8 @@ extern int nvec_remove_eventhandler(struct device* dev,
 
 extern void nvec_poweroff(void);
 
+extern void nvec_restart(void);
+
 /* Request/Response types */
 #define NVEC_CMD_SYSTEM					0x01
 #define NVEC_CMD_BATTERY				0x02

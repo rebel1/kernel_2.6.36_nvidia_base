@@ -76,20 +76,45 @@ static __initdata struct tegra_clk_init_table shuttle_clk_init_table[] = {
 	/* pll_p is used as system clock - and for ulpi */
 	{ "pll_p",		"clk_m",		216000000,	true},		/* must be always on */
 	{ "pll_p_out1",	"pll_p",		 28800000,	true},		/* must be always on - audio clocks ...*/
+#if 1
+	{ "pll_p_out2",	"pll_p",		108000000,	true},		/* must be always on */
+#else
 	{ "pll_p_out2",	"pll_p",		 48000000,	true},		/* must be always on - usb perhaps ? unused ?*/
+#endif
 	{ "pll_p_out3",	"pll_p",		 72000000,	true},		/* must be always on - i2c, camera */
 	{ "pll_p_out4",	"pll_p",		 26000000,	true},		/* must be always on - USB ulpi */
 	
 	/* pll_m is used as memory clock - bootloader also uses it this way */
 	{ "pll_m",		"clk_m",		666000000,	true},		/* always on - memory clocks */	
+	
+#if 1
+	{ "pll_m_out1",	"pll_m",		222000000,	true},		/* always on - unused ?*/
+#else
 	{ "pll_m_out1",	"pll_m",		 26000000,	true},		/* always on - unused ?*/
+#endif
+
+#if 1
+	{ "emc",		"pll_m",		333000000,	true},		/* always on */
+#else
 	{ "emc",		"pll_m",		666000000,	true},		/* always on */
+#endif
 
 	/* pll_c is used as graphics clock and system clock */
 	{ "pll_c",		"clk_m",		600000000,	true},		/* always on - graphics and camera clocks */
+#if 1
+	{ "pll_c_out1",	"pll_c",		171428571,	true},		/* must be always on - system clock */
+#else
 	{ "pll_c_out1",	"pll_c",		108000000,	true},		/* must be always on - system clock */
+#endif
 
+#if 1
+	{ "sclk",		"pll_p_out2",	108000000,	true},		/* must be always on */
+	{ "avp.sclk",	"sclk",			108000000,	false},		/* must be always on */
+	{ "cop",		"sclk",			108000000,	false},		/* must be always on */
+	
+#else
 	{ "sclk",		"pll_c_out1",	108000000,	true},		/* must be always on */
+#endif
 	{ "hclk",		"sclk",			108000000,	true},		/* must be always on */
 	{ "pclk",		"hclk",			 54000000,	true},		/* must be always on */
 
@@ -108,13 +133,27 @@ static __initdata struct tegra_clk_init_table shuttle_clk_init_table[] = {
 #endif
 
 	/* pll_d and pll_d_out0 are clock sources for HDMI output */
+#if 1
+	{ "pll_d",		"clk_m",		  1000000,	true},		/* hdmi clock */
+	{ "pll_d_out0", "pll_d",    	  1000000,  true},		/* hdmi clock */
+#else
 	{ "pll_d",		"clk_m",		  5000000,	true},		/* hdmi clock */
 	{ "pll_d_out0", "pll_d",    	  5000000,  true},		/* hdmi clock */
+#endif
 
 	{ "clk_d",		"clk_m",		 24000000,	true},
 
 	/* pll_u is a clock source for the USB bus */
 	{ "pll_u",  	"clk_m",    	480000000,  false},		/* USB ulpi clock */
+
+	/* pll_e not used */
+	{ "pll_e",  	"clk_m",       1200000000,  false},		/* */
+
+	/* pll_x */
+	{ "pll_x",  	"clk_m",        760000000,  true},		/* */
+	{ "cclk",		"pll_x"			760000000,  true},	
+	{ "cpu",		"cclk"			760000000,  true},	
+	
 	
 	/* Peripherals - Always on */
 	{ "csite",		"pll_p",		144000000,	true},		/* csite - coresite */ /* always on */
@@ -123,14 +162,33 @@ static __initdata struct tegra_clk_init_table shuttle_clk_init_table[] = {
 	{ "kfuse",		"clk_m",		 12000000,	true},		/* kfuse-tegra */ /* always on - no init req */
 
 	/* Peripherals - Turned on demand */
+#if 1
+	{ "3d",     	"pll_m",    	333000000,  false},		/* tegra_grhost, gr3d */
+#else
 	{ "3d",     	"pll_c",    	300000000,  false},		/* tegra_grhost, gr3d */
+#endif
 	{ "2d",     	"pll_c",    	300000000,  false},		/* tegra_grhost, gr2d */
 	{ "epp",    	"pll_c",    	300000000, 	false}, 	/* tegra_grhost */	
+#if 1
+	{ "mpe",		"pll_m",		111000000,	false},		/* tegra_grhost */	
+#else
 	{ "mpe",		"pll_c",		300000000,	false},		/* tegra_grhost */	
-	{ "host1x",		"pll_p",		144000000,	false},		/* tegra_grhost */
+#endif
 	
+#if 1
+	{ "host1x",		"pll_p",		108000000,	false},		/* tegra_grhost */
+#else
+	{ "host1x",		"pll_p",		144000000,	false},		/* tegra_grhost */
+#endif
+	
+	
+#if 1
+	{ "vi",     	"pll_m",   		111000000,  false},		/* tegra_camera : unused on shuttle */
+	{ "vi_sensor",	"pll_m",		111000000,	false},		/* tegra_camera : unused on shuttle */
+#else
 	{ "vi",     	"pll_c",   		150000000,  false},		/* tegra_camera : unused on shuttle */
 	{ "vi_sensor",	"pll_c",		150000000,	false},		/* tegra_camera : unused on shuttle */
+#endif
 	{ "csi",		"pll_p_out3",	 72000000,	false},		/* tegra_camera */
 	{ "isp",		"clk_m",		 12000000,	false},		/* tegra_camera */
 	{ "csus",		"clk_m",		 12000000,	false},		/* tegra_camera */
@@ -157,7 +215,11 @@ static __initdata struct tegra_clk_init_table shuttle_clk_init_table[] = {
 	{ "spdif_in",	"pll_p",		 36000000,	false},
 	{ "spdif_out",  "pll_a_out0", 	  6144000,  false},
 #	else
+#if 1
+	{ "i2s1",   	"pll_a_out0",     2822400,  false},		/* i2s.0 */
+#else
 	{ "i2s1",   	"pll_a_out0",    11289600,  false},		/* i2s.0 */
+#endif
 	{ "i2s2",		"pll_a_out0",    11289600,	false},		/* i2s.1 */
 	{ "audio", 		"pll_a_out0",    11289600,  false},
 	{ "audio_2x",	"audio",		 22579200,	false},
@@ -184,35 +246,59 @@ static __initdata struct tegra_clk_init_table shuttle_clk_init_table[] = {
 	{ CDEV1,   NULL /*"pll_a_out0"*/,11289600,  false},		/* used as audio CODEC MCLK */	
 #	endif
 #endif
+
+#if 1
+	{ CDEV2,   NULL /*"pll_p_out4"*/,24000000,  false}, 	/* probably used as USB clock - perhaps 24mhz ?*/	
+#else
 	{ CDEV2,   NULL /*"pll_p_out4"*/,26000000,  false}, 	/* probably used as USB clock - perhaps 24mhz ?*/	
+#endif
 
 	
 	{ "i2c1_i2c",	"pll_p_out3",	 72000000,	false},		/* tegra-i2c.0 */
 	{ "i2c2_i2c",	"pll_p_out3",	 72000000,	false},		/* tegra-i2c.1 */
 	{ "i2c3_i2c",	"pll_p_out3",	 72000000,	false},		/* tegra-i2c.2 */
 	{ "dvc_i2c",	"pll_p_out3",	 72000000,	false},		/* tegra-i2c.3 */
+
+#if 1
+	{ "i2c1",		"clk_m",		   800000,	false},		/* tegra-i2c.0 */
+	{ "i2c2",		"clk_m",		   315789,	false},		/* tegra-i2c.1 */
+	{ "i2c3",		"clk_m",		   800000,	false},		/* tegra-i2c.2 */
+#else
 	{ "i2c1",		"clk_m",		  3000000,	false},		/* tegra-i2c.0 */
 	{ "i2c2",		"clk_m",		  3000000,	false},		/* tegra-i2c.1 */
 	{ "i2c3",		"clk_m",		  3000000,	false},		/* tegra-i2c.2 */
+#endif
+	
+#if 1
+	{ "dvc",		"clk_m",		  2400000,	false},		/* tegra-i2c.3 */
+#else
 	{ "dvc",		"clk_m",		  3000000,	false},		/* tegra-i2c.3 */
+#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38)	
 	{ "apbdma",		"pclk",			54000000,	false}, 	/* tegra-dma */
 #endif
 	
 	{ "uarta",		"pll_p",		216000000,	false},		/* tegra_uart.0 uart.0 */
-    { "uartb",  	"pll_p",    	216000000,  false},		/* tegra_uart.1 uart.1 */
 	{ "uartc",		"pll_p",		216000000,	false},		/* tegra_uart.2 uart.2 */
+	
+#if 1
+    { "uartb",  	"clk_m",    	 12000000,  false},		/* tegra_uart.1 uart.1 */	
+	{ "uartd",		"clk_m",		 12000000,	false},		/* tegra_uart.3 uart.3 */
+	{ "uarte",		"clk_m",		 12000000,	false},		/* tegra_uart.4 uart.4 */
+#else
+    { "uartb",  	"pll_p",    	216000000,  false},		/* tegra_uart.1 uart.1 */	
 	{ "uartd",		"pll_p",		216000000,	false},		/* tegra_uart.3 uart.3 */
 	{ "uarte",		"pll_p",		216000000,	false},		/* tegra_uart.4 uart.4 */
+#endif	
 
 	{ "disp1",  	"pll_p",    	216000000, 	false},		/* tegradc.0 */
 	{ "disp2",  	"pll_p",    	216000000, 	false},		/* tegradc.1 */	
 	
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38)	
-	{ "dsi",		"pll_d",		  5000000,	false},		/* tegra_dc.0, tegra_dc.1 */
+	{ "dsi",		"pll_d",		  1000000,	false},		/* tegra_dc.0, tegra_dc.1 */
 #else
-	{ "dsi",		"pll_d_out0",	  5000000,	false},		/* tegra_dc.0, tegra_dc.1 - bug on kernel 2.6.36*/
+	{ "dsi",		"pll_d_out0",	  1000000,	false},		/* tegra_dc.0, tegra_dc.1 - bug on kernel 2.6.36*/
 #endif
 	{ "hdmi",		"clk_m",		 12000000,	false},		/* tegra_dc.0, tegra_dc.1 */
 	
@@ -231,10 +317,25 @@ static __initdata struct tegra_clk_init_table shuttle_clk_init_table[] = {
 		
 	{ "vfir",		"clk_m",		 12000000,	false},
 
+#if 1
 	{ "sdmmc1",		"pll_p",		 48000000,	false},		/* sdhci-tegra.0 */
+#else
+	{ "sdmmc1",		"pll_p",		 25411764,	false},		/* sdhci-tegra.0 */
+#endif
+	
+#if 1
+	{ "sdmmc2",		"clk_p",		   400000,	false},		/* sdhci-tegra.1 */
+	{ "sdmmc3",		"clk_m",		 12000000,	false},		/* sdhci-tegra.2 */
+#else
 	{ "sdmmc2",		"pll_p",		 48000000,	false},		/* sdhci-tegra.1 */
 	{ "sdmmc3",		"pll_p",		 48000000,	false},		/* sdhci-tegra.2 */
+#endif
+
+#if 1
+	{ "sdmmc4",		"pll_p",		 25411764,	false},		/* sdhci-tegra.3 */
+#else
 	{ "sdmmc4",		"pll_p",		 48000000,	false},		/* sdhci-tegra.3 */
+#endif
 
 	{ "la",			"clk_m",		 12000000,	false},			
 
@@ -242,7 +343,12 @@ static __initdata struct tegra_clk_init_table shuttle_clk_init_table[] = {
 	
 	{ "vcp",		"clk_m",		 12000000,	false},		/* tegra_avp */	
 	{ "bsea",		"clk_m",		 12000000,	false},		/* tegra_avp */	
+	
+#if 1
+	{ "vde",		"pll_p",		 28800000,	false},		/* tegra-avp */
+#else
 	{ "vde",		"pll_p",		216000000,	false},		/* tegra-avp */
+#endif
 	
 	{ "bsev",		"clk_m",		 12000000,	false},		/* tegra_aes */	
 
@@ -256,7 +362,11 @@ static __initdata struct tegra_clk_init_table shuttle_clk_init_table[] = {
 	{ "usb2",		"clk_m",		 12000000,	false},		/* tegra_ehci.1 */
 	{ "usb3",		"clk_m",		 12000000,	false},		/* tegra_ehci.2 */
 	
+#if 1
+	{ "pwm",    	"clk_m",   		    93385,  false},		/* tegra-pwm.0 tegra-pwm.1 tegra-pwm.2 tegra-pwm.3*/
+#else
 	{ "pwm",    	"clk_m",   		 12000000,  false},		/* tegra-pwm.0 tegra-pwm.1 tegra-pwm.2 tegra-pwm.3*/
+#endif
 	
 	{ "kbc",		"clk_32k",			32768,	false},		/* tegra-kbc */
 	{ "blink",		"clk_32k",			32768,	false},		/* used for bluetooth */

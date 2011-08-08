@@ -557,7 +557,6 @@ static int __devinit tps6586x_i2c_probe(struct i2c_client *client,
 		goto err_add_devs;
 	}
 
-
 	tps6586x_i2c_client = client;
 
 	return 0;

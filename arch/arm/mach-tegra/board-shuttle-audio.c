@@ -243,12 +243,13 @@ static struct tegra_audio_platform_data tegra_audio_pdata[] = {
 
 static struct alc5624_platform_data alc5624_pdata = {
 #if LINUX_VERSION_CODE == KERNEL_VERSION(2,6,36)
-	.mclk 		= "clk_dev1",
-#else
-	.mclk 		= "cdev1",
+	.mclk 			= "clk_dev1",
+#else	
+	.mclk 			= "cdev1",
 #endif
-	.spkvdd_mv 	= 5000,	/* Speaker Vdd in millivolts */
-	.hpvdd_mv 	= 3300,	/* Headphone Vdd in millivolts */
+	.spkvdd_mv 		= 5000,	/* Speaker Vdd in millivolts */
+	.hpvdd_mv 		= 3300,	/* Headphone Vdd in millivolts */
+	.spkvol_scale 	= 50,	/* Scale speaker volume to the percent of maximum range */
 };
 
 static struct i2c_board_info __initdata shuttle_i2c_bus0_board_info[] = {

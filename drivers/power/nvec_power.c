@@ -33,7 +33,7 @@
 
 #include <asm/irq.h>
  
-#define NVEC_POWER_POLLING_INTERVAL 30000
+#define NVEC_POWER_POLLING_INTERVAL 10000
 
 struct nvec_power {
 	struct notifier_block 	 notifier;
@@ -744,7 +744,7 @@ static void nvec_power_work_func(struct work_struct *work)
 		struct nvec_power, work);
 
 	/* Update power supply status */
-	if (!nvec_power_update_status(power,true)) {
+	if (!nvec_power_update_status(power,false)) {
 		power_supply_changed(&nvec_bat_psy);
 		power_supply_changed(&nvec_ac_psy);
 	}
