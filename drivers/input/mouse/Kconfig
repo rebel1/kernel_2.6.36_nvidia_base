@@ -37,6 +37,16 @@ config MOUSE_PS2
 	  To compile this driver as a module, choose M here: the
 	  module will be called psmouse.
 
+config MOUSE_NVEC
+	tristate "Support for PS2 mouse attached to the NVidia Embedded controller"
+	select MFD_CORE
+	select SERIO
+	select SERIO_LIBPS2
+	depends on MFD_NVEC
+	help
+	  Support for a Ps2 Mouse attached to the NVidia embedded 
+	  controller used on several Tegra2 based boards.  
+	  
 config MOUSE_PS2_ALPS
 	bool "ALPS PS/2 mouse protocol extension" if EMBEDDED
 	default y

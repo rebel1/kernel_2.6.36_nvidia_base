@@ -34,7 +34,10 @@ struct fixed_voltage_data {
 	int gpio;
 	unsigned startup_delay;
 	bool enable_high;
+	bool set_as_input_to_enable;
+	bool set_as_input_to_disable;
 	bool is_enabled;
+	bool is_input;
 };
 
 static int fixed_voltage_is_enabled(struct regulator_dev *dev)
@@ -47,25 +50,56 @@ static int fixed_voltage_is_enabled(struct regulator_dev *dev)
 static int fixed_voltage_enable(struct regulator_dev *dev)
 {
 	struct fixed_voltage_data *data = rdev_get_drvdata(dev);
-
+	int ret = 0;
+	
 	if (gpio_is_valid(data->gpio)) {
-		gpio_set_value_cansleep(data->gpio, data->enable_high);
+		if (!data->set_as_input_to_enable) {
+			if (data->is_input) {
+				ret = gpio_direction_output(data->gpio, data->enable_high);
+				if (ret)
+					return ret;
+				data->is_input = false;
+			} else {
+				gpio_set_value_cansleep(data->gpio, data->enable_high);
+			}
+		} else 
+		if (!data->is_input) {
+			ret = gpio_direction_input(data->gpio);
+			if (ret)
+				return ret;
+			data->is_input = true;
+		}
 		data->is_enabled = true;
 	}
 
-	return 0;
+	return ret;
 }
 
 static int fixed_voltage_disable(struct regulator_dev *dev)
 {
 	struct fixed_voltage_data *data = rdev_get_drvdata(dev);
-
+	int ret = 0;
+	
 	if (gpio_is_valid(data->gpio)) {
-		gpio_set_value_cansleep(data->gpio, !data->enable_high);
+		if (!data->set_as_input_to_disable) {
+			if (data->is_input) {
+				ret = gpio_direction_output(data->gpio, !data->enable_high);
+				if (ret)
+					return ret;
+				data->is_input = false;
+			} else {
+				gpio_set_value_cansleep(data->gpio, !data->enable_high);
+			}
+		} else 
+		if (!data->is_input) {
+			ret = gpio_direction_input(data->gpio);
+			if (ret)
+				return ret;
+			data->is_input = true;
+		}
 		data->is_enabled = false;
 	}
-
-	return 0;
+	return ret;
 }
 
 static int fixed_voltage_enable_time(struct regulator_dev *dev)
@@ -132,6 +166,8 @@ static int __devinit reg_fixed_voltage_probe(struct platform_device *pdev)
 
 	if (gpio_is_valid(config->gpio)) {
 		drvdata->enable_high = config->enable_high;
+		drvdata->set_as_input_to_enable = config->set_as_input_to_enable;
+		drvdata->set_as_input_to_disable = config->set_as_input_to_disable;
 
 		/* FIXME: Remove below print warning
 		 *
@@ -156,14 +192,17 @@ static int __devinit reg_fixed_voltage_probe(struct platform_device *pdev)
 			goto err_name;
 		}
 
-		/* set output direction without changing state
-		 * to prevent glitch
-		 */
+		/* set direction without changing state to prevent glitch */
 		drvdata->is_enabled = config->enabled_at_boot;
-		ret = drvdata->is_enabled ?
-				config->enable_high : !config->enable_high;
 
-		ret = gpio_direction_output(config->gpio, ret);
+		if ((drvdata->set_as_input_to_enable  &&  drvdata->is_enabled) ||
+			(drvdata->set_as_input_to_disable && !drvdata->is_enabled)) {
+			ret = gpio_direction_input(config->gpio);
+		} else {
+			ret = drvdata->is_enabled ?
+				config->enable_high : !config->enable_high;
+			ret = gpio_direction_output(config->gpio, ret);
+		}
 		if (ret) {
 			dev_err(&pdev->dev,
 			   "Could not configure regulator enable GPIO %d direction: %d\n",

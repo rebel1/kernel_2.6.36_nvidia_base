@@ -429,6 +429,54 @@ static void pmc_32kwritel(u32 val, unsigned long offs)
 	udelay(130);
 }
 
+
+#define TEGRA_ALL_REVS (~0ul)
+#define APB_MISC_HIDREV		0x804
+#define FUSE_VISIBILITY_REG_OFFSET		0x48
+#define FUSE_VISIBILITY_BIT_POS		28
+#define FUSE_SPARE_BIT_18_REG_OFFSET		0x248
+#define FUSE_SPARE_BIT_19_REG_OFFSET		0x24c
+ 
+static bool tegra_chip_compare(u32 chip, u32 major_rev, u32 minor_rev)
+{
+	void __iomem *misc = IO_ADDRESS(TEGRA_APB_MISC_BASE);
+	u32 val = readl(misc + APB_MISC_HIDREV);
+	u32 id = (val>>8) & 0xff;
+	u32 minor = (val>>16) & 0xf;
+	u32 major = (val>>4) & 0xf;
+
+	return (chip==id) &&
+		(minor_rev==minor || minor_rev==TEGRA_ALL_REVS) &&
+		(major_rev==major || major_rev==TEGRA_ALL_REVS);
+}
+
+static bool tegra_is_ap20_a03(void) 
+{
+	return tegra_chip_compare(0x20, 0x1, 0x3);
+}
+ 
+static bool tegra_is_ap20_a03p(void)
+{
+	if (tegra_is_ap20_a03()) {
+		void __iomem *clk = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
+		void __iomem *fuse = IO_ADDRESS(TEGRA_FUSE_BASE);
+		u32 clk_val = readl(clk + FUSE_VISIBILITY_REG_OFFSET);
+		u32 fuse_18_val = 0;
+		u32 fuse_19_val = 0;
+
+		clk_val |= (1 << FUSE_VISIBILITY_BIT_POS);
+		writel(clk_val, (clk + FUSE_VISIBILITY_REG_OFFSET));
+		fuse_18_val = readl(fuse + FUSE_SPARE_BIT_18_REG_OFFSET);
+		fuse_19_val = readl(fuse + FUSE_SPARE_BIT_19_REG_OFFSET);
+		clk_val &= ~(1 << FUSE_VISIBILITY_BIT_POS);
+		writel(clk_val, (clk + FUSE_VISIBILITY_REG_OFFSET));
+		return (((fuse_18_val|fuse_19_val)&1)? true:false);
+	}
+	else {
+		return false;
+	}
+} 
+
 static u8 *iram_save = NULL;
 static unsigned int iram_save_size = 0;
 static void __iomem *iram_code = IO_ADDRESS(TEGRA_IRAM_CODE_AREA);
@@ -460,9 +508,23 @@ static void tegra_suspend_dram(bool do_lp0)
 
 		tegra_legacy_irq_set_lp1_wake_mask();
 	} else {
-		u32 boot_flag = readl(pmc + PMC_SCRATCH0);
-		pmc_32kwritel(boot_flag | 1, PMC_SCRATCH0);
+		
+		u32 scratch0 = readl(pmc + PMC_SCRATCH0);
+		
+		/* lp0 restore is broken in the ap20 a03 boot rom, so fake the
+		 * bootrom into performing a regular boot, but pass a flag to the
+		 * bootloader to bypass the kernel reload and jump to the lp0
+		 * restore sequence */
+		if (tegra_is_ap20_a03() && (!tegra_is_ap20_a03p()))
+			scratch0 |= (1<<5);
+		else
+			scratch0 |= 1;
+
+		pmc_32kwritel(scratch0, PMC_SCRATCH0);
+
+		/* Write the AVP warmboot entry address in SCRATCH1 */
 		pmc_32kwritel(wb0_restore, PMC_SCRATCH1);
+		
 		writel(0x0, pmc + PMC_SCRATCH39);
 		mode |= TEGRA_POWER_CPU_PWRREQ_OE;
 		mode |= TEGRA_POWER_PWRREQ_OE;

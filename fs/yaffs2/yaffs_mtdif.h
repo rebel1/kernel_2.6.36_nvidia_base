@@ -22,6 +22,6 @@
 extern struct nand_oobinfo yaffs_oobinfo;
 extern struct nand_oobinfo yaffs_noeccinfo;
 #endif
-int nandmtd_EraseBlockInNAND(yaffs_Device *dev, int blockNumber);
-int nandmtd_InitialiseNAND(yaffs_Device *dev);
+int nandmtd_erase_block(yaffs_dev_t *dev, int block_no);
+int nandmtd_initialise(yaffs_dev_t *dev);
 #endif
