@@ -319,6 +319,8 @@ static int __init get_cfg_from_tags(void)
 		tegra_bootloader_fb_size  = NvBootArgs.MemHandleArgs[NvBootArgs.FramebufferArgs.MemHandleKey - ATAG_NVIDIA_PRESERVED_MEM_0].Size;
 		
 		pr_info("Nvidia TAG: framebuffer: %u @ 0x%08lx\n",tegra_bootloader_fb_size,tegra_bootloader_fb_start);
+		
+		/* Unfortunately, the kernel locks up if we enable this */
 		tegra_bootloader_fb_start = tegra_bootloader_fb_size = 0;
 	}
 	
@@ -557,11 +559,11 @@ static void __init tegra_shuttle_init(void)
 		pr_err("Failed to set wifi sdmmc tap delay\n");
 	}
 
-	/* Initialize the clocks */
-	shuttle_clks_init();
-
 	/* Initialize the pinmux */
 	shuttle_pinmux_init();
+	
+	/* Initialize the clocks - clocks require the pinmux to be initialized first */
+	shuttle_clks_init();
 
 	/* Register i2c devices - required for Power management and MUST be done before the power register */
 	shuttle_i2c_register_devices();

@@ -38,6 +38,9 @@
 #include <linux/miscdevice.h>
 #include <linux/input.h>
 
+#include <linux/gpio.h>
+#define TEGRA_GPIO_GSENSOR_TOGGLE       57
+
 /** BMA150 acceleration data 
 	\brief Structure containing acceleration values for x,y and z-axis in signed short
 */
@@ -560,6 +563,7 @@ struct bma150ctx {
 #define BMA150_CONF1_INT_MSK	((1<<BMA150_ALERT__POS) | (1<<BMA150_EN_ANY_MOTION__POS) | (1<<BMA150_ENABLE_HG__POS) | (1<<BMA150_ENABLE_LG__POS))
 #define BMA150_CONF2_INT_MSK	((1<<BMA150_ENABLE_ADV_INT__POS) | (1<<BMA150_NEW_DATA_INT__POS) | (1<<BMA150_LATCH_INT__POS))
 
+static int temp1;
 /*	i2c write routine for bma150	*/
 static int bma150_i2c_write(struct bma150ctx *ctx, unsigned char reg_addr, unsigned char *data, unsigned char len)
 {
@@ -1226,6 +1230,30 @@ static int bma150_read_temperature(struct bma150ctx *ctx, unsigned char *temp)
 */
 static int bma150_read_accel_xyz(struct bma150ctx *ctx, bma150acc_t * acc)
 {
+	static int counter = 0;
+	static int toggle = 1;
+	int new_toggle;
+	// start GSENSOR Toggle with GPIO
+	if( counter % 25 == 0 ) {
+	new_toggle = gpio_get_value( TEGRA_GPIO_GSENSOR_TOGGLE );
+	if(new_toggle == 0)
+	{
+	new_toggle = 1 ;
+	} else {
+	new_toggle = 0 ;
+	}
+	if( toggle != new_toggle ) {
+	toggle = new_toggle;
+	printk(KERN_INFO "[SHUTTLE] GPIO:%d = %d Set GSENSOR MODE: [%s]\n",
+	TEGRA_GPIO_GSENSOR_TOGGLE, toggle, toggle == 0 ? "sleep" : "wake-->normal");
+	bma150_set_mode( ctx, BMA150_MODE_SLEEP );
+	if( toggle == 1 ) {
+	bma150_set_mode( ctx, BMA150_MODE_NORMAL );
+		}
+	    }
+	counter = 0;
+	}
+	
 	int comres;
 	unsigned char data[6];
 
@@ -1250,6 +1278,10 @@ static int bma150_read_accel_xyz(struct bma150ctx *ctx, bma150acc_t * acc)
 	acc->z |= (BMA150_GET_BITSLICE(data[5], BMA150_ACC_Z_MSB) << BMA150_ACC_Z_LSB__LEN);
 	acc->z = acc->z << (sizeof(short) * 8 - (BMA150_ACC_Z_LSB__LEN + BMA150_ACC_Z_MSB__LEN));
 	acc->z = acc->z >> (sizeof(short) * 8 - (BMA150_ACC_Z_LSB__LEN + BMA150_ACC_Z_MSB__LEN));
+	
+	temp1=(acc->x * -1);
+	acc->x=acc->y;
+	acc->y=temp1;
 
 	return 0;
 }

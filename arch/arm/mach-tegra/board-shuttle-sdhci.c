@@ -105,6 +105,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
 
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data4 = {
 	.cd_gpio = SHUTTLE_SDHC_CD,
+	.cd_gpio_polarity = 1,
 	.wp_gpio = SHUTTLE_SDHC_WP,
 	.power_gpio = SHUTTLE_SDHC_POWER,
 };

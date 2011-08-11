@@ -47,7 +47,7 @@ static int no_vsync;
 
 module_param_named(no_vsync, no_vsync, int, S_IRUGO | S_IWUSR);
 
-static int use_dynamic_emc = 1;
+static int use_dynamic_emc = 0;
 
 module_param_named(use_dynamic_emc, use_dynamic_emc, int, S_IRUGO | S_IWUSR);
 
