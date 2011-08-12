@@ -37,6 +37,11 @@
 #include <linux/delay.h>
 #include <linux/miscdevice.h>
 #include <linux/input.h>
+#include <linux/gpio.h>
+
+#define TEGRA_GPIO_GSENSOR_TOGGLE       57
+#define xy_flip
+static int temp1;
 
 /** BMA150 acceleration data 
 	\brief Structure containing acceleration values for x,y and z-axis in signed short
@@ -1226,6 +1231,29 @@ static int bma150_read_temperature(struct bma150ctx *ctx, unsigned char *temp)
 */
 static int bma150_read_accel_xyz(struct bma150ctx *ctx, bma150acc_t * acc)
 {
+	static int counter = 0;
+	static int toggle = 1;
+	int new_toggle;
+	// start GSENSOR Toggle with GPIO
+		if( counter % 25 == 0 ) {
+			 new_toggle = gpio_get_value( TEGRA_GPIO_GSENSOR_TOGGLE );
+			 if(new_toggle == 0)
+				{
+				new_toggle = 1 ;
+				} else {
+				new_toggle = 0 ;
+				}
+				if( toggle != new_toggle ) {
+				toggle = new_toggle;
+				printk(KERN_INFO "[SHUTTLE] GPIO:%d = %d Set GSENSOR MODE: [%s]\n",
+				TEGRA_GPIO_GSENSOR_TOGGLE, toggle, toggle == 0 ? "sleep" : "wake-->normal");
+				bma150_set_mode( ctx, BMA150_MODE_SLEEP );
+				if( toggle == 1 ) {
+				bma150_set_mode( ctx, BMA150_MODE_NORMAL );
+				}
+				    }
+					counter = 0;
+					}
 	int comres;
 	unsigned char data[6];
 
@@ -1251,6 +1279,11 @@ static int bma150_read_accel_xyz(struct bma150ctx *ctx, bma150acc_t * acc)
 	acc->z = acc->z << (sizeof(short) * 8 - (BMA150_ACC_Z_LSB__LEN + BMA150_ACC_Z_MSB__LEN));
 	acc->z = acc->z >> (sizeof(short) * 8 - (BMA150_ACC_Z_LSB__LEN + BMA150_ACC_Z_MSB__LEN));
 
+#ifdef xy_flip
+	temp1=(acc->x * -1);
+	acc->x=acc->y;
+	acc->y=temp1; 
+#endif
 	return 0;
 }
 

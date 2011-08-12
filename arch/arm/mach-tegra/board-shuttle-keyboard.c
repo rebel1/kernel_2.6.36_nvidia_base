@@ -91,7 +91,7 @@ static struct gpio_keys_button shuttle_keys[] = {
 static struct gpio_keys_platform_data shuttle_keys_platform_data = {
 	.buttons 	= shuttle_keys,
 	.nbuttons 	= ARRAY_SIZE(shuttle_keys),
-	.rep		= true, /* auto repeat enabled */
+	.rep		= false, /* auto repeat enabled */
 };
 
 static struct platform_device shuttle_keys_device = {
