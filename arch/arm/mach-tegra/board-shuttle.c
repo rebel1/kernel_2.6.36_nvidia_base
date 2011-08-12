@@ -335,7 +335,7 @@ static int __init get_cfg_from_tags(void)
 		tegra_lp0_vec_size  = NvBootArgs.MemHandleArgs[NvBootArgs.WarmbootArgs.MemHandleKey - ATAG_NVIDIA_PRESERVED_MEM_0].Size;
 
 		pr_info("Nvidia TAG: LP0: %u @ 0x%08lx\n",tegra_lp0_vec_size,tegra_lp0_vec_start);		
-		//tegra_lp0_vec_start = tegra_lp0_vec_size = 0;
+		tegra_lp0_vec_start = tegra_lp0_vec_size = 0;
 
 	}
 	
