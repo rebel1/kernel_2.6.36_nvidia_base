@@ -32,6 +32,10 @@ struct regulator_init_data;
  * 			boot or not. 1 = Yes, 0 = No
  * 			This is used to keep the regulator at
  * 			the default state
+ * @set_as_input_to_enable: If set, the gpio is set as input to 
+ *                  enable the regulator
+ * @set_as_input_to_disable: If set, the gpio is set as input to 
+ *                  disable the regulator
  * @init_data:		regulator_init_data
  *
  * This structure contains fixed voltage regulator configuration
@@ -45,6 +49,8 @@ struct fixed_voltage_config {
 	unsigned startup_delay;
 	unsigned enable_high:1;
 	unsigned enabled_at_boot:1;
+	unsigned set_as_input_to_enable:1;
+	unsigned set_as_input_to_disable:1;
 	struct regulator_init_data *init_data;
 };
 

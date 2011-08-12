@@ -470,4 +470,28 @@ config INPUT_ALPS_GPIO_SCROLLWHEEL
 	  To compile this driver as a module, choose M here: the
 	  module will be called alps_gpio_scrollwheel.
 
+config INPUT_BMA150
+	tristate "Bosh Sensortec BMA150/SMB380 Tri-axis accelerometer"
+	help
+	  Say Y here if you want to use Bosh BMA150/SMB380 Accelerometer
+	  driver
+
+	  This driver currently only supports I2C interface to the
+	  controller. Also select the I2C method.
+
+	  If unsure, say N
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called bma150.
+	  
+config INPUT_BMA150_I2C
+	tristate "Support I2C bus connection"
+	depends on INPUT_BMA150 && I2C
+	help
+	  Say Y here if you want to use Bosh BMA150/SMB380 Accelerometer
+	  through I2C interface.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called bma150.
+
 endif

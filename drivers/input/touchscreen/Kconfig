@@ -132,6 +132,30 @@ config TOUCHSCREEN_DYNAPRO
 	  To compile this driver as a module, choose M here: the
 	  module will be called dynapro.
 
+config TOUCHSCREEN_EGALAX
+	tristate "EGALAX based touch panel controllers"
+	depends on I2C
+	help
+	  Say Y here if you have a eGalax touchscreen connected to
+	  your system (used in TabletPCs).
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called egalax.
+
+config TOUCHSCREEN_IT7260
+	tristate "IT7260 based touch panel controllers"
+	depends on I2C
+	help
+	  Say Y here if you have a IT7260 based touchscreen connected to
+	  your system (used in TabletPCs).
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called it7260.
+	  
 config TOUCHSCREEN_HAMPSHIRE
 	tristate "Hampshire serial touchscreen"
 	select SERIO

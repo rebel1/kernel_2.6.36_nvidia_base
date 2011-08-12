@@ -22,6 +22,14 @@ config PDA_POWER
 	  one or two external power supplies (AC/USB) connected to main and
 	  backup batteries, and optional builtin charger.
 
+config NVEC_POWER
+	tristate "NVidia Embedded controller Power driver"
+	depends on MFD_NVEC
+	help
+	  Say Y here to enable Nvidia embedded controller power driver for
+	  Tegra2 based boards
+
+	  
 config APM_POWER
 	tristate "APM emulation for class batteries"
 	depends on APM_EMULATION
@@ -178,5 +186,12 @@ config BATTERY_INTEL_MID
 	help
 	  Say Y here to enable the battery driver on Intel MID
 	  platforms.
+
+config BATTERY_TPS6586X
+	tristate "Battery driver for Texas TPS6586x"
+	depends on MFD_TPS6586X
+	help
+	  Say Y here to enable the battery driver of the TPS6586x
+	  
 
 endif # POWER_SUPPLY

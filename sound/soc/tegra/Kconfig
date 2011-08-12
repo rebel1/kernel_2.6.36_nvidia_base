@@ -1,24 +1,54 @@
-config TEGRA_ALSA
-    tristate "Tegra ALSA SoC support"
-    select TEGRA_PCM
-    select TEGRA_I2S
-    select TEGRA_IEC
-    select TEGRA_GENERIC_CODEC
-    select TEGRA_JACK
-    help
-       Say Y if you for ALSA SoC support
-
-config TEGRA_PCM
+config SND_TEGRA_SOC
+	tristate "SoC Audio for the Tegra System-on-Chip"
+	depends on ARCH_TEGRA
+	default m
+	select TEGRA_ALSA
+	help
+	  Say Y or M here if you want support for SoC audio on Tegra. 
+	  
+config SND_TEGRA_SOC_PCM
     tristate "Tegra ALSA pcm callbacks"
+	depends on SND_TEGRA_SOC
+	default m
+	help
+	  Say Y or M if you want to add support for PCM streams in Tegra audio
 
-config TEGRA_I2S
+config SND_TEGRA_SOC_I2S
     tristate "Tegra I2S"
+	depends on SND_TEGRA_SOC
+	default m
+	help
+	  Say Y or M if you want to add support for codecs attached to the
+	  Tegra I2S interface. You will also need to select the individual
+	  machine drivers to support below. 	
 
-config TEGRA_IEC
+config SND_TEGRA_SOC_IEC
     tristate "Tegra IEC"
+	depends on SND_TEGRA_SOC
+	default m
+	help
+	  Say Y or M if you want to add support for IEC audio streams (SPDIF)
 
-config TEGRA_GENERIC_CODEC
-    tristate "Tegra ALSA Generic Codec support"
+config SND_TEGRA_SOC_HARMONY
+	tristate "SoC Audio support for Tegra Harmony reference board"
+	depends on SND_TEGRA_SOC && MACH_HARMONY && I2C
+	default m
+	select SND_TEGRA_SOC_I2S
+	select SND_TEGRA_SOC_IEC
+	select SND_TEGRA_SOC_PCM
+	select SND_SOC_WM8903
+	help
+	  Say Y or M here if you want to add support for SoC audio on the
+	  Tegra Harmony reference board.
 
-config TEGRA_JACK
-    tristate "Tegra wired accessory jack support"
+config SND_TEGRA_SOC_SHUTTLE
+	tristate "SoC Audio support for Shuttle based (P10AN01) Tablet PCs"
+	depends on SND_TEGRA_SOC && MACH_SHUTTLE && I2C
+	default m
+	select SND_TEGRA_SOC_I2S
+	select SND_TEGRA_SOC_IEC
+	select SND_TEGRA_SOC_PCM
+	select SND_SOC_ALC5624
+	help
+	  Say Y or M here if you want to add support for SoC audio on the
+	  Shuttle (P10AN01) Tablet PCs. 
