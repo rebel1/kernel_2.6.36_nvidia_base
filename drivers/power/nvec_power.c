@@ -6,6 +6,7 @@
  * Authors:  Ilya Petrov <ilya.muromec@gmail.com>
  *           Marc Dietrich <marvin24@gmx.de>
  *           Eduardo José Tagle <ejtagle@tutopia.com>  
+ *           Rene Bensch <rene.bensch@googlemail.com>
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -922,6 +923,10 @@ static int nvec_power_resume(struct platform_device *dev)
 	if (power->in_s3_state_gpio) 
 		gpio_set_value(power->in_s3_state_gpio,0);
 	queue_delayed_work(power->work_queue, &power->work,
+		msecs_to_jiffies(NVEC_POWER_POLLING_INTERVAL));
+	if (power->in_s3_state_gpio) 
+		gpio_set_value(power->in_s3_state_gpio,0);
+	queue_delayed_work(power->isr_wq, &power->work,
 		msecs_to_jiffies(NVEC_POWER_POLLING_INTERVAL));
 	return 0;
 }
