@@ -506,6 +506,8 @@ static int nvec_power_update_status(struct nvec_power *power,bool force_update)
 			power->time_remain = NVEC_GETU16(getRemTime.TimeRemaining) * 60; /* in seconds */
 		} else {
 			dev_err(power->dev,"unable to get Battery remaining time\n");
+			//nvec_restart();
+			
 		}
 	}
 	
@@ -919,13 +921,12 @@ static int __devexit nvec_power_remove(struct platform_device *dev)
 
 static int nvec_power_resume(struct platform_device *dev)
 {
+	nvec_restart();
 	struct nvec_power *power = platform_get_drvdata(dev);
 	if (power->in_s3_state_gpio) 
 		gpio_set_value(power->in_s3_state_gpio,0);
 	queue_delayed_work(power->work_queue, &power->work,
 		msecs_to_jiffies(NVEC_POWER_POLLING_INTERVAL));
-	if (power->in_s3_state_gpio) 
-		gpio_set_value(power->in_s3_state_gpio,0);
 	queue_delayed_work(power->isr_wq, &power->work,
 		msecs_to_jiffies(NVEC_POWER_POLLING_INTERVAL));
 	return 0;
