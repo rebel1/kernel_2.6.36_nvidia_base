@@ -43,6 +43,12 @@
 #define  USB_VBUS_STATUS	(1 << 10)
 #define  USB_INTS		(USB_VBUS_INT_STATUS | USB_ID_INT_STATUS)
 
+#define  USB_VBUS_WAKEUP_SW_VALUE	(1 << 12)
+#define  USB_VBUS_WAKEUP_SW_ENABLE	(1 << 11)
+#define  USB_ID_SW_VALUE			(1 << 4)
+#define  USB_ID_SW_ENABLE			(1 << 3)
+
+
 struct tegra_otg_data {
 	struct otg_transceiver otg;
 	unsigned long int_status;
@@ -58,7 +64,7 @@ struct tegra_otg_data {
 	bool clk_enabled;
 };
 
-static struct tegra_otg_data *tegra_clone;
+static struct tegra_otg_data *tegra_clone = NULL;
 
 static inline unsigned long otg_readl(struct tegra_otg_data *tegra,
 				      unsigned int offset)
@@ -118,11 +124,13 @@ static void irq_work(struct work_struct *work)
 {
 	struct tegra_otg_data *tegra =
 		container_of(work, struct tegra_otg_data, work);
+	struct tegra_otg_platform_data *pdata = tegra->otg.dev->platform_data;
 	struct otg_transceiver *otg = &tegra->otg;
 	enum usb_otg_state from = otg->state;
 	enum usb_otg_state to = OTG_STATE_UNDEFINED;
 	unsigned long flags;
 	unsigned long status;
+	unsigned long val;
 
 	if (tegra->detect_vbus) {
 		tegra->detect_vbus = false;
@@ -143,8 +151,12 @@ static void irq_work(struct work_struct *work)
 			else
 				to = OTG_STATE_A_SUSPEND;
 		}
-		else
-			to = OTG_STATE_A_HOST;
+		else {
+			if (from != OTG_STATE_B_PERIPHERAL)
+				to = OTG_STATE_A_HOST;
+			else
+				to = OTG_STATE_A_SUSPEND;
+		}
 	}
 	if (from != OTG_STATE_A_HOST) {
 		if (tegra->int_status & USB_VBUS_INT_STATUS) {
@@ -156,27 +168,105 @@ static void irq_work(struct work_struct *work)
 	}
 	spin_unlock_irqrestore(&tegra->lock, flags);
 
-	if (to != OTG_STATE_UNDEFINED) {
+	if (to != from &&
+		to != OTG_STATE_UNDEFINED) {
+		
 		otg->state = to;
 
 		dev_info(tegra->otg.dev, "%s --> %s\n", tegra_state_name(from),
 					      tegra_state_name(to));
 
 		if (to == OTG_STATE_A_SUSPEND) {
-			if (from == OTG_STATE_A_HOST)
+			if (from == OTG_STATE_A_HOST) {
+
+				/* Apply the override if we are not using the real state */
+				if (pdata->get_cableid_state) {
+					val = otg_readl(tegra, USB_PHY_WAKEUP);
+					val |= USB_ID_SW_VALUE;
+					otg_writel(tegra, val, USB_PHY_WAKEUP);
+				}
+			
 				tegra_stop_host(tegra);
-			else if (from == OTG_STATE_B_PERIPHERAL && otg->gadget)
+			}
+			else if (from == OTG_STATE_B_PERIPHERAL && otg->gadget) {
+
+				/* Apply the override if we are not using the real state */
+				if (pdata->get_vbus_state) {
+					val = otg_readl(tegra, USB_PHY_WAKEUP);
+					val &= ~USB_VBUS_WAKEUP_SW_VALUE;
+					otg_writel(tegra, val, USB_PHY_WAKEUP);
+				}
+			
 				usb_gadget_vbus_disconnect(otg->gadget);
+			}
 		} else if (to == OTG_STATE_B_PERIPHERAL && otg->gadget) {
-			if (from == OTG_STATE_A_SUSPEND)
+			if (from == OTG_STATE_A_SUSPEND) {
+
+				/* Apply the override if we are not using the real state */
+				if (pdata->get_vbus_state) {
+					val = otg_readl(tegra, USB_PHY_WAKEUP);
+					val |= USB_VBUS_WAKEUP_SW_VALUE;
+					otg_writel(tegra, val, USB_PHY_WAKEUP);
+				}
+			
 				usb_gadget_vbus_connect(otg->gadget);
+			}
 		} else if (to == OTG_STATE_A_HOST) {
-			if (from == OTG_STATE_A_SUSPEND)
-			tegra_start_host(tegra);
+			if (from == OTG_STATE_A_SUSPEND) {
+
+				/* Apply the override if we are not using the real state */
+				if (pdata->get_cableid_state) {
+					val = otg_readl(tegra, USB_PHY_WAKEUP);
+					val &= ~USB_ID_SW_VALUE;
+					otg_writel(tegra, val, USB_PHY_WAKEUP);
+				}
+			
+				tegra_start_host(tegra);
+			}
 		}
 	}
 	clk_disable(tegra->clk);
 	tegra_otg_disable_clk();
+}
+
+/* Compute the interrupts we need to enable */
+static unsigned long tegra_otg_get_status_overrides(struct tegra_otg_data *tegra,
+						unsigned long orgstatus)
+{
+	struct tegra_otg_platform_data *pdata = tegra->otg.dev->platform_data;
+	unsigned long val = orgstatus;
+		
+	/* Override the detected values using the supplied callbacks */
+	if (pdata->get_vbus_state) {
+		if (pdata->get_vbus_state()) {
+			val |= USB_VBUS_STATUS;
+		} else {
+			val &= ~USB_VBUS_STATUS;
+		}
+	}
+	
+	if (pdata->get_cableid_state) {
+		if (pdata->get_cableid_state()) {
+			val |= USB_ID_STATUS;
+		} else {
+			val &= ~USB_ID_STATUS;
+		}
+	}
+	
+	return val;
+}
+
+/* Computes the int sources based on the status */
+static unsigned long tegra_compute_int_sources(unsigned long val)
+{
+	if ((val & USB_ID_STATUS) && (val & USB_VBUS_STATUS)) {
+		val |= USB_VBUS_INT_STATUS;
+	} else if (!(val & USB_ID_STATUS)) {
+		val |= USB_ID_INT_STATUS;
+	} else {
+		val &= ~(USB_ID_INT_STATUS | USB_VBUS_INT_STATUS);
+	}
+	return val;
 }
 
 static irqreturn_t tegra_otg_irq(int irq, void *data)
@@ -187,9 +277,22 @@ static irqreturn_t tegra_otg_irq(int irq, void *data)
 
 	spin_lock_irqsave(&tegra->lock, flags);
 
+	/* Get the interrupt cause */
 	val = otg_readl(tegra, USB_PHY_WAKEUP);
+	
+	/* And clean it */
+	otg_writel(tegra, val, USB_PHY_WAKEUP);
+	
+	/* Override the read values if the user specified callbacks */
+	val = tegra_otg_get_status_overrides(tegra, val);
+
+	/* Compute the interrupt sources based on the values */
+	val = tegra_compute_int_sources(val);
+
+	/* If interrupts enabled */
 	if (val & (USB_VBUS_INT_EN | USB_ID_INT_EN)) {
-		otg_writel(tegra, val, USB_PHY_WAKEUP);
+
+		/* If an interrupt has to be processed */
 		if ((val & USB_ID_INT_STATUS) || (val & USB_VBUS_INT_STATUS)) {
 			tegra->int_status = val;
 			tegra->detect_vbus = false;
@@ -209,6 +312,35 @@ void tegra_otg_check_vbus_detection(void)
 }
 EXPORT_SYMBOL(tegra_otg_check_vbus_detection);
 
+void tegra_otg_check_status(void)
+{
+	unsigned long val;
+	
+	/* Avoid crashes if not initialized yet */
+	if (!tegra_clone) 
+		return;
+		
+	val = tegra_clone->int_status;
+	
+	/* Get the status as specified by the user */
+	val = tegra_otg_get_status_overrides(tegra_clone, val);
+
+	/* Compute the interrupt sources based on the values */
+	val = tegra_compute_int_sources(val);
+
+	/* If interrupts enabled */
+	if (val & (USB_VBUS_INT_EN | USB_ID_INT_EN)) {
+
+		/* If an interrupt has to be processed */
+		if ((val & USB_ID_INT_STATUS) || (val & USB_VBUS_INT_STATUS)) {
+			tegra_clone->int_status = val;
+			tegra_clone->detect_vbus = false;
+			schedule_work(&tegra_clone->work);
+		}
+	}
+}
+EXPORT_SYMBOL(tegra_otg_check_status);
+
 static int tegra_otg_set_peripheral(struct otg_transceiver *otg,
 				struct usb_gadget *gadget)
 {
@@ -224,15 +356,14 @@ static int tegra_otg_set_peripheral(struct otg_transceiver *otg,
 	val |= (USB_ID_INT_EN | USB_ID_PIN_WAKEUP_EN);
 	otg_writel(tegra, val, USB_PHY_WAKEUP);
 	clk_disable(tegra->clk);
+	
+	/* Override the read values if the user specified callbacks */
+	val = tegra_otg_get_status_overrides(tegra, val);
 
-	if ((val & USB_ID_STATUS) && (val & USB_VBUS_STATUS)) {
-		val |= USB_VBUS_INT_STATUS;
-	} else if (!(val & USB_ID_STATUS)) {
-		val |= USB_ID_INT_STATUS;
-	} else {
-		val &= ~(USB_ID_INT_STATUS | USB_VBUS_INT_STATUS);
-	}
+	/* Compute the interrupt sources based on the values */
+	val = tegra_compute_int_sources(val);
 
+	/* Execute the ISR based on the status */
 	if ((val & USB_ID_INT_STATUS) || (val & USB_VBUS_INT_STATUS)) {
 		tegra->int_status = val;
 		tegra->detect_vbus = false;
@@ -247,15 +378,14 @@ static int tegra_otg_set_host(struct otg_transceiver *otg,
 {
 	struct tegra_otg_data *tegra;
 	unsigned long val;
-
 	tegra = container_of(otg, struct tegra_otg_data, otg);
+
 	otg->host = host;
 
 	clk_enable(tegra->clk);
 	val = otg_readl(tegra, USB_PHY_WAKEUP);
 	val &= ~(USB_VBUS_INT_STATUS | USB_ID_INT_STATUS);
-
-	val |= (USB_ID_INT_EN | USB_ID_PIN_WAKEUP_EN);
+	val |= USB_ID_PIN_WAKEUP_EN | USB_ID_INT_EN;
 	otg_writel(tegra, val, USB_PHY_WAKEUP);
 	clk_disable(tegra->clk);
 
@@ -277,6 +407,13 @@ static int tegra_otg_probe(struct platform_device *pdev)
 	struct tegra_otg_data *tegra;
 	struct resource *res;
 	int err;
+	unsigned long val;
+	struct tegra_otg_platform_data *pdata = pdev->dev.platform_data;
+	
+	if (!pdata) {
+		dev_err(&pdev->dev, "No platform data\n");
+		return -ENODEV;
+	}
 
 	tegra = kzalloc(sizeof(struct tegra_otg_data), GFP_KERNEL);
 	if (!tegra)
@@ -320,6 +457,35 @@ static int tegra_otg_probe(struct platform_device *pdev)
 
 	tegra->otg.state = OTG_STATE_A_SUSPEND;
 
+	/* Read the configuration */
+	val = otg_readl(tegra, USB_PHY_WAKEUP);
+	
+	/* Set overrides for all the detections to override with custom functions */
+	if (pdata->get_vbus_state) {
+		val |= USB_VBUS_WAKEUP_SW_ENABLE;
+		if (pdata->get_vbus_state()) {
+			val |= USB_VBUS_WAKEUP_SW_VALUE;
+		} else {
+			val &= ~USB_VBUS_WAKEUP_SW_VALUE;
+		}
+	} else {
+		val &= ~USB_VBUS_WAKEUP_SW_ENABLE;
+	}
+	
+	if (pdata->get_cableid_state) {
+		val |= USB_ID_SW_ENABLE;
+		if (pdata->get_cableid_state()) {
+			val |= USB_ID_SW_VALUE;
+		} else {
+			val &= ~USB_ID_SW_VALUE;
+		}
+	} else {
+		val &= ~USB_ID_SW_ENABLE;
+	}
+	
+	/* And write the configuration */
+	otg_writel(tegra, val, USB_PHY_WAKEUP);
+	
 	err = otg_set_transceiver(&tegra->otg);
 	if (err) {
 		dev_err(&pdev->dev, "can't register transceiver (%d)\n", err);
@@ -334,12 +500,13 @@ static int tegra_otg_probe(struct platform_device *pdev)
 	}
 	tegra->irq = res->start;
 	err = request_threaded_irq(tegra->irq, tegra_otg_irq,
-				   NULL,
-				   IRQF_SHARED, "tegra-otg", tegra);
+				NULL,
+				IRQF_SHARED, "tegra-otg", tegra);
 	if (err) {
 		dev_err(&pdev->dev, "Failed to register IRQ\n");
 		goto err_irq;
 	}
+
 	INIT_WORK (&tegra->work, irq_work);
 
 	dev_info(&pdev->dev, "otg transceiver registered\n");
