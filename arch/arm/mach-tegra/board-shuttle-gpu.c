@@ -3,6 +3,9 @@
  *
  * Copyright (C) 2011 Eduardo José Tagle <ejtagle@tutopia.com>
  *
+ * Authors:	Eduardo José Tagle 	<ejtagle@tutopia.com>
+ * 		Rene Bensch "rebel1"	<rene.bensch@googlemail.com>
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -21,6 +24,8 @@
 #include <linux/resource.h>
 #include <linux/platform_device.h>
 #include <linux/pwm_backlight.h>
+#include <linux/kernel.h>
+#include <mach/tegra_cpufreq.h>
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
@@ -499,12 +504,20 @@ static void shuttle_panel_early_suspend(struct early_suspend *h)
 {
 	if (num_registered_fb > 0)
 		fb_blank(registered_fb[0], FB_BLANK_POWERDOWN);
+
+#ifdef CONFIG_CPU_FREQ
+	cpufreq_save_default_governor();
+	cpufreq_set_conservative_governor();
+#endif
 }
 
 static void shuttle_panel_late_resume(struct early_suspend *h)
 {
 	if (num_registered_fb > 0)
 		fb_blank(registered_fb[0], FB_BLANK_UNBLANK);
+#ifdef CONFIG_CPU_FREQ
+	cpufreq_restore_default_governor();
+#endif
 }
 #endif 
 

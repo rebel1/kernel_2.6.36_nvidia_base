@@ -2,6 +2,8 @@
  * BMA150/SMB380 linux driver
  *  Copyright (C) 2011 Eduardo José Tagle <ejtagle@tutopia.com> 
  *  Copyright (C) 2009 Bosch Sensortec GmbH
+ *  Authors:	Eduardo José Tagle   <ejtagle@tutopia.com>
+ *		Rene Bensch "rebel1" <rene.bensch@googlemail,com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
