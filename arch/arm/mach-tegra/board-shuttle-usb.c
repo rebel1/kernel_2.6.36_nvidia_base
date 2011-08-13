@@ -233,41 +233,37 @@ static struct platform_device tegra_otg = {
 
 #endif
 
-struct platform_device *usb_host_pdev = NULL;
+
 
 static struct platform_device * tegra_usb_otg_host_register(void)
 {
 	int val;
+	struct platform_device *pdev = NULL;
 
-	/* If already in host mode, dont try to switch to it again */
-	if (usb_host_pdev != NULL)
-		return usb_host_pdev;
-	
 	/* And register the USB host device */
-	usb_host_pdev = platform_device_alloc(tegra_ehci1_device.name,
+	pdev = platform_device_alloc(tegra_ehci1_device.name,
 			tegra_ehci1_device.id);
-	if (!usb_host_pdev)
+	if (!pdev)
 		goto err_2;
 
-	val = platform_device_add_resources(usb_host_pdev, tegra_ehci1_device.resource,
+	val = platform_device_add_resources(pdev, tegra_ehci1_device.resource,
 		tegra_ehci1_device.num_resources);
 	if (val)
 		goto error;
 
-	usb_host_pdev->dev.dma_mask =  tegra_ehci1_device.dev.dma_mask;
-	usb_host_pdev->dev.coherent_dma_mask = tegra_ehci1_device.dev.coherent_dma_mask;
-	usb_host_pdev->dev.platform_data = tegra_ehci1_device.dev.platform_data;
+	pdev->dev.dma_mask =  tegra_ehci1_device.dev.dma_mask;
+	pdev->dev.coherent_dma_mask = tegra_ehci1_device.dev.coherent_dma_mask;
+	pdev->dev.platform_data = tegra_ehci1_device.dev.platform_data;
 
-	val = platform_device_add(usb_host_pdev);
+	val = platform_device_add(pdev);
 	if (val)
 		goto error_add;
 
-	return usb_host_pdev;
+	return pdev;
 
 error_add:
 error:
-	platform_device_put(usb_host_pdev);
-	usb_host_pdev = NULL;
+	platform_device_put(pdev);
 err_2:
 	pr_err("%s: failed to add the host controller device\n", __func__);	
 	return NULL;
@@ -276,18 +272,19 @@ err_2:
 static void tegra_usb_otg_host_unregister(struct platform_device *pdev)
 {
 	/* Unregister the host adapter */
-	if (usb_host_pdev != NULL) {
-		platform_device_unregister(usb_host_pdev);
-		usb_host_pdev = NULL;
-	}
+	platform_device_unregister(pdev);
+}
 
-	return;
-	
+static int usb_cableid_state = 0;
+static unsigned int tegra_usb_otg_get_cableid_state(void)
+{
+	return usb_cableid_state;
 }
 
 static struct tegra_otg_platform_data tegra_otg_pdata = {
 	.host_register = &tegra_usb_otg_host_register,
 	.host_unregister = &tegra_usb_otg_host_unregister,
+	.get_cableid_state = tegra_usb_otg_get_cableid_state,
 };
 
 
@@ -309,16 +306,35 @@ static struct platform_device *shuttle_usb_devices[] __initdata = {
 
 static void tegra_set_host_mode(void)
 {
-	/* Place interface in host mode */
-	gpio_direction_input(SHUTTLE_USB0_VBUS );
+	/* Place interface in host mode	*/
+
+	/* Enable VBUS - This means we can power USB devices, but
+	   we cant use VBUS detection at all */
+	gpio_direction_input(SHUTTLE_USB0_VBUS);
+	
+	/* CableID = 0 for host */
+	usb_cableid_state = 0;
+	
+	/* Call the Otg layer to notify it of the change */
+	tegra_otg_check_status();
 }
 
 static void tegra_set_gadget_mode(void)
 {
 	/* Place interfase in gadget mode */
-	gpio_direction_output(SHUTTLE_USB0_VBUS, 0 ); /* Gadget */
-}
 
+	/* Disable VBUS power. This means that if a USB host
+	   is plugged into the Tegra USB port, then we will 
+	   detect the power it supplies and go into gadget 
+	   mode */
+	gpio_direction_output(SHUTTLE_USB0_VBUS, 0); 
+	
+	/* CableID = 1 for gadget */
+	usb_cableid_state = 1;
+	
+	/* Call the Otg layer to notify it of the change */
+	tegra_otg_check_status();
+}
 
 struct kobject *usb_kobj = NULL;
 
@@ -328,15 +344,11 @@ static ssize_t usb_read(struct device *dev, struct device_attribute *attr,
 	int ret = 0;
 	
 	if (!strcmp(attr->attr.name, "host_mode")) {
-		if (usb_host_pdev != NULL)
+		if (!usb_cableid_state)
 			ret = 1;
 	}
 
-	if (!ret) {
-		return strlcpy(buf, "0\n", 3);
-	} else {
-		return strlcpy(buf, "1\n", 3);
-	}
+	return strlcpy(buf, ret ? "1\n" : "0\n", 3);
 }
 
 static ssize_t usb_write(struct device *dev, struct device_attribute *attr,
@@ -392,6 +404,10 @@ int __init shuttle_usb_register_devices(void)
 		pr_err("Unable to register USB mode switch");
 		return 0;	
 	}
+
+	/* Enable gadget mode by default */
+	tegra_set_gadget_mode();
+	
 	
 	/* Attach an attribute to the already registered usbbus to let the user switch usb modes */
 	return sysfs_create_group(usb_kobj, &usb_attr_group); 
