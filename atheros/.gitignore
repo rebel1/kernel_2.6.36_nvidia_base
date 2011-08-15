@@ -1,0 +1,15 @@
+.*
+*.o
+*.o.*
+*.ko
+*.mod.c
+*.lst
+*.symtypes
+*.symvers
+*.order
+
+!.gitignore
+
+*.orig
+*~
+\#*#
