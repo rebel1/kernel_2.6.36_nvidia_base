@@ -628,6 +628,7 @@ static int bma150_init(struct bma150ctx *ctx)
 
 	/* If device not found, say so now */
 	return (ctx->chip_id == 0x02) ? 0 : -ENODEV;
+
 }
 
 /** Perform soft reset of BMA150 via bus command
@@ -1238,24 +1239,24 @@ static int bma150_read_accel_xyz(struct bma150ctx *ctx, bma150acc_t * acc)
 	int new_toggle;
 	// start GSENSOR Toggle with GPIO
 		if( counter % 25 == 0 ) {
-			 new_toggle = gpio_get_value( TEGRA_GPIO_GSENSOR_TOGGLE );
-			 if(new_toggle == 0)
-				{
-				new_toggle = 1 ;
-				} else {
-				new_toggle = 0 ;
+		 new_toggle = gpio_get_value( TEGRA_GPIO_GSENSOR_TOGGLE );
+		 if(new_toggle == 0)
+			{
+			new_toggle = 1 ;
+			} else {
+			new_toggle = 0 ;
+			}
+			if( toggle != new_toggle ) {
+			toggle = new_toggle;
+			printk(KERN_INFO "[SHUTTLE] GPIO:%d = %d Set GSENSOR MODE: [%s]\n",
+			TEGRA_GPIO_GSENSOR_TOGGLE, toggle, toggle == 0 ? "sleep" : "wake-->normal");
+			bma150_set_mode( ctx, BMA150_MODE_SLEEP );
+			if( toggle == 1 ) {
+			bma150_set_mode( ctx, BMA150_MODE_NORMAL );
+			}
+			    }
+			counter = 0;
 				}
-				if( toggle != new_toggle ) {
-				toggle = new_toggle;
-				printk(KERN_INFO "[SHUTTLE] GPIO:%d = %d Set GSENSOR MODE: [%s]\n",
-				TEGRA_GPIO_GSENSOR_TOGGLE, toggle, toggle == 0 ? "sleep" : "wake-->normal");
-				bma150_set_mode( ctx, BMA150_MODE_SLEEP );
-				if( toggle == 1 ) {
-				bma150_set_mode( ctx, BMA150_MODE_NORMAL );
-				}
-				    }
-					counter = 0;
-					}
 	int comres;
 	unsigned char data[6];
 
