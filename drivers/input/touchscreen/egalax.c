@@ -74,8 +74,8 @@ static int eGalax_init(struct eGalax_ts_data *ts)
 	
 	// Push the GPIO down and release it
 	gpio_direction_output(gpio, 0);
-	mdelay(10);
-	mdelay(10);
+	msleep(10);
+	msleep(10);
 	gpio_direction_input(gpio);
 
 	// Clean data

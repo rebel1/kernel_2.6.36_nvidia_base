@@ -406,7 +406,7 @@ static int it7260_init(struct it7260_ts_data *ts)
 	}
 	
 	// Let the IT reboot and init ... Takes some time ...
-	mdelay(200);
+	msleep(200);
 	
 	if (it7260_wait_for_idle(ts)) {
 		dev_err(&ts->client->dev,"wait for idle on reset touchpad timed out [2]\n");

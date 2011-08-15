@@ -696,11 +696,11 @@ static int bma150_set_offset_eeprom(struct bma150ctx *ctx, unsigned char xyz, un
 	data = BMA150_SET_BITSLICE(data, BMA150_OFFSET_X_LSB, offset);
 	if ((comres = bma150_i2c_write(ctx, (BMA150_EEP_OFFSET + BMA150_OFFSET_X_LSB__REG + xyz), &data, 1)))
 		return comres;
-	mdelay(34);
+	msleep(34);
 	data = (offset & 0x3ff) >> 2;
 	if ((comres = bma150_i2c_write(ctx, (BMA150_EEP_OFFSET + BMA150_OFFSET_X_MSB__REG + xyz), &data, 1)))
 		return comres;
-	mdelay(34);
+	msleep(34);
 	return 0;
 }
 
@@ -1517,7 +1517,7 @@ static int bma150_read_accel_avg(struct bma150ctx *ctx, int num_avg, bma150acc_t
 		y_avg += accel.y;
 		z_avg += accel.z;
 
-		mdelay(10);
+		msleep(10);
 	}
 	avg->x = x_avg /= num_avg;	/* calculate averages, min and max values */
 	avg->y = y_avg /= num_avg;
@@ -1608,7 +1608,7 @@ static int bma150_calibrate(struct bma150ctx *ctx, bma150acc_t orientation, int 
 				return comres;
 			if ((comres = bma150_set_offset(ctx, 2, offset_z)))
 				return comres;
-			mdelay(20);
+			msleep(20);
 		}
 	} while (need_calibration || !min_max_ok);
 
@@ -1630,7 +1630,7 @@ static int bma150_calibrate(struct bma150ctx *ctx, bma150acc_t orientation, int 
 	if ((comres = bma150_set_ee_w(ctx, 0)))
 		return comres;
 
-	mdelay(20);
+	msleep(20);
 	*tries = ltries - *tries;
 
 	return !need_calibration;
@@ -1645,7 +1645,7 @@ static int bma150_device_power_on(struct bma150ctx *ctx)
 		return comres;
 	if ((comres = bma150_set_bandwidth(ctx, BMA150_BW_25HZ)))
 		return comres;
-	mdelay(20);
+	msleep(20);
 	return 0;
 }
 

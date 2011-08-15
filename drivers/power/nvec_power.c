@@ -6,7 +6,6 @@
  * Authors:  Ilya Petrov <ilya.muromec@gmail.com>
  *           Marc Dietrich <marvin24@gmx.de>
  *           Eduardo José Tagle <ejtagle@tutopia.com>  
- *           Rene Bensch <rene.bensch@googlemail.com>
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -34,7 +33,7 @@
 
 #include <asm/irq.h>
  
-#define NVEC_POWER_POLLING_INTERVAL 15000
+#define NVEC_POWER_POLLING_INTERVAL 10000
 
 struct nvec_power {
 	struct notifier_block 	 notifier;
@@ -51,7 +50,7 @@ struct nvec_power {
 
 	struct mutex 			 lock;			/* mutex protect battery update */
 	
-	int    next_update;						/* Time to next update */
+	long unsigned int        next_update;	/* Time to next update */
 	
 	int    low_batt_irq;					/* If there is a low battery IRQ */
 	int	   low_batt_alarm_percent;			/* Percentage of charge to fire the low batt alarm */
@@ -327,33 +326,44 @@ static void get_bat_mfg_data(struct nvec_power *power)
    the battery status */
 static int nvec_power_update_status(struct nvec_power *power,bool force_update)
 {
-	int bat_status_changed = 0;
+	int bat_status_changed = 0,v;
 	struct device* master = power->master;
 	
-	/* Do not accept to update too often */
-	if (!force_update && (power->next_update - jiffies) > 0)
+	/* Do not accept to update too often - NVEC seems not to be able to handle
+	   too much pressure */
+	if (!force_update && ((int)(power->next_update - jiffies)) > 0)
 		return 0;
 
-	/* get exclusive access to the accelerometer */
+	pr_debug("Updating battery info: %lu, %lu\n",power->next_update,jiffies);
+	
+	/* get exclusive access to the battery */
 	mutex_lock(&power->lock);	
 
 	{
+		/* Get remaining capacity */
 		struct NVEC_ANS_BATTERY_GETCAPACITYREMAINING_PAYLOAD getRemCapacity;
 		if (nvec_cmd_xfer(master,NVEC_CMD_BATTERY,NVEC_CMD_BATTERY_GETCAPACITYREMAINING,
 					NULL,0,&getRemCapacity,sizeof(getRemCapacity)) == sizeof(getRemCapacity)) {
-			power->capacity_remain = NVEC_GETU16(getRemCapacity.CapacityRemaining) * 1000;
+			v = NVEC_GETU16(getRemCapacity.CapacityRemaining) * 1000;
+			if (v != power->capacity_remain) {
+				bat_status_changed = 1;
+			}
+			power->capacity_remain = v;
 		} else {
 			dev_err(power->dev,"unable to get Battery remaining capacity\n");
 		}
 	}
 	
 	{
+		/* Get battery status */
 		struct NVEC_ANS_BATTERY_GETSLOTSTATUS_PAYLOAD getSlotStatus;
 		if (nvec_cmd_xfer(master,NVEC_CMD_BATTERY,NVEC_CMD_BATTERY_GETSLOTSTATUS, 
 					NULL,0,&getSlotStatus,sizeof(getSlotStatus)) == sizeof(getSlotStatus)) {
 					
 			/* If battery is present */
+			v = POWER_SUPPLY_STATUS_UNKNOWN;
 			if (getSlotStatus.SlotStatus & NVEC_ANS_BATTERY_SLOT_STATUS_0_PRESENT_STATE_PRESENT) {
+			
 				if (power->bat_present == 0) {
 					bat_status_changed = 1;
 					get_bat_mfg_data(power);
@@ -363,28 +373,34 @@ static int nvec_power_update_status(struct nvec_power *power,bool force_update)
 
 				switch (getSlotStatus.SlotStatus & NVEC_ANS_BATTERY_SLOT_STATUS_0_CHARGING_STATE_MASK) {
 				case NVEC_ANS_BATTERY_SLOT_STATUS_0_CHARGING_STATE_IDLE:
-					power->bat_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+					v = POWER_SUPPLY_STATUS_NOT_CHARGING;
 					break;
 				case NVEC_ANS_BATTERY_SLOT_STATUS_0_CHARGING_STATE_CHARGING:
-					power->bat_status = POWER_SUPPLY_STATUS_CHARGING;
+					v = POWER_SUPPLY_STATUS_CHARGING;
 					break;
 				case NVEC_ANS_BATTERY_SLOT_STATUS_0_CHARGING_STATE_DISCHARGING:
-					power->bat_status = POWER_SUPPLY_STATUS_DISCHARGING;
+					v = POWER_SUPPLY_STATUS_DISCHARGING;
 					break;
 				default:
-					power->bat_status = POWER_SUPPLY_STATUS_UNKNOWN;
+					v = POWER_SUPPLY_STATUS_UNKNOWN;
 				}
+				
 			} else {
+			
 				if (power->bat_present == 1)
 					bat_status_changed = 1;
 
-				power->bat_present = 0;
-				power->bat_status = POWER_SUPPLY_STATUS_UNKNOWN;
+				power->bat_present = 0;	
 			}
-			power->bat_cap = getSlotStatus.CapacityGauge;
 			
+			if (v != power->bat_status) {
+				bat_status_changed = 1;
+			}
+			power->bat_status = v;
+
 			/* Validate bat_cap. If out of range, calculate it if possible */
-			if (power->bat_cap == 0 || power->bat_cap > 100) {
+			v = getSlotStatus.CapacityGauge;
+			if (v == 0 || v > 100) {
 				int range;
 				
 				dev_dbg(power->dev,"available batt capacity invalid. Estimating it\n");
@@ -393,7 +409,7 @@ static int nvec_power_update_status(struct nvec_power *power,bool force_update)
 				if (range <= 0) {
 				
 					/* Estimation is impossible. Assume 50% charge ... */
-					power->bat_cap = 50;
+					v = 50;
 				} else {
 				
 					/* Estimate remaining capacity */
@@ -402,9 +418,13 @@ static int nvec_power_update_status(struct nvec_power *power,bool force_update)
 						perc = 0;
 					if (perc > 100)
 						perc = 100;
-					power->bat_cap = perc;
+					v = perc;
 				}
 			}
+			if (v != power->bat_cap) {
+				bat_status_changed = 1;
+			}
+			power->bat_cap = v;
 			
 		} else {
 			dev_err(power->dev,"unable to get Battery status\n");
@@ -415,7 +435,11 @@ static int nvec_power_update_status(struct nvec_power *power,bool force_update)
 		struct NVEC_ANS_BATTERY_GETVOLTAGE_PAYLOAD getVoltage;
 		if (nvec_cmd_xfer(master,NVEC_CMD_BATTERY,NVEC_CMD_BATTERY_GETVOLTAGE, 
 					NULL,0,&getVoltage,sizeof(getVoltage)) == sizeof(getVoltage)) {
-			power->bat_voltage_now = NVEC_GETU16(getVoltage.PresentVoltage) * 1000;
+			v = NVEC_GETU16(getVoltage.PresentVoltage) * 1000;
+			if (v != power->bat_voltage_now) {
+				bat_status_changed = 1;
+			}
+			power->bat_voltage_now = v;
 		} else {
 			dev_err(power->dev,"unable to get Battery voltage\n");
 		}
@@ -427,19 +451,29 @@ static int nvec_power_update_status(struct nvec_power *power,bool force_update)
 					NULL,0,&getCurrent,sizeof(getCurrent)) == sizeof(getCurrent)) {
 			/* The value is signed, so convert it */
 			s16 val = (s16) NVEC_GETU16(getCurrent.PresentCurrent);
-			power->bat_current_now = val * 1000;
+			v = val * 1000;
+			if (v != power->bat_current_now) {
+				bat_status_changed = 1;
+			}
+			power->bat_current_now = v;
 			
 			/* Validate battery status. If current is negative, battery is
 			   discharging ... otherwise is charging, unless charge is 100%.
 			   We validate data, as some firmware do not provide proper information */
 			if (power->bat_present) {
 				if (val < 0) {
+					if (power->bat_status != POWER_SUPPLY_STATUS_DISCHARGING)
+						bat_status_changed = 1;
 					power->bat_status = POWER_SUPPLY_STATUS_DISCHARGING;
 				} else if (val > 0) {
 					if (power->bat_cap >= 100) {
 						power->bat_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+						if (power->bat_status != POWER_SUPPLY_STATUS_NOT_CHARGING)
+							bat_status_changed = 1;
 					} else {
 						power->bat_status = POWER_SUPPLY_STATUS_CHARGING;
+						if (power->bat_status != POWER_SUPPLY_STATUS_CHARGING)
+							bat_status_changed = 1;
 					}
 				}
 			}
@@ -483,7 +517,11 @@ static int nvec_power_update_status(struct nvec_power *power,bool force_update)
 					NULL,0,&getAvgCurrent,sizeof(getAvgCurrent)) == sizeof(getAvgCurrent)) {
 			/* The value is signed, so convert it */
 			s16 val = (s16) NVEC_GETU16(getAvgCurrent.AverageCurrent);
-			power->bat_current_avg = val * 1000;
+			v = val * 1000;
+			if (v != power->bat_current_avg) {
+				bat_status_changed = 1;
+			}
+			power->bat_current_avg = v;
 		} else {
 			dev_err(power->dev,"unable to get Battery average current\n");
 		}
@@ -493,7 +531,11 @@ static int nvec_power_update_status(struct nvec_power *power,bool force_update)
 		struct NVEC_ANS_BATTERY_GETTEMPERATURE_PAYLOAD getTemp;
 		if (nvec_cmd_xfer(master,NVEC_CMD_BATTERY,NVEC_CMD_BATTERY_GETTEMPERATURE, 
 					NULL,0,&getTemp,sizeof(getTemp)) == sizeof(getTemp)) {
-			power->bat_temperature = NVEC_GETU16(getTemp.Temperature) - 2732;
+			v = NVEC_GETU16(getTemp.Temperature) - 2732;
+			if (v != power->bat_temperature) {
+				bat_status_changed = 1;
+			}
+			power->bat_temperature = v;
 		} else {
 			dev_err(power->dev,"unable to get Battery temperature\n");
 		}
@@ -503,11 +545,13 @@ static int nvec_power_update_status(struct nvec_power *power,bool force_update)
 		struct NVEC_ANS_BATTERY_GETTIMEREMAINING_PAYLOAD getRemTime;
 		if (nvec_cmd_xfer(master,NVEC_CMD_BATTERY,NVEC_CMD_BATTERY_GETTIMEREMAINING,
 					NULL,0,&getRemTime,sizeof(getRemTime)) == sizeof(getRemTime)) {
-			power->time_remain = NVEC_GETU16(getRemTime.TimeRemaining) * 60; /* in seconds */
+			v = NVEC_GETU16(getRemTime.TimeRemaining) * 60; /* in seconds */
+			if (v != power->time_remain) {
+				bat_status_changed = 1;
+			}
+			power->time_remain = v;
 		} else {
 			dev_err(power->dev,"unable to get Battery remaining time\n");
-			//nvec_restart();
-			
 		}
 	}
 	
@@ -747,10 +791,7 @@ static void nvec_power_work_func(struct work_struct *work)
 		struct nvec_power, work);
 
 	/* Update power supply status */
-	if (!nvec_power_update_status(power,true)) {
-		power_supply_changed(&nvec_bat_psy);
-		power_supply_changed(&nvec_ac_psy);
-	}
+	nvec_power_update_status(power,true);
 	
 	queue_delayed_work(power->work_queue, &power->work,
 				 msecs_to_jiffies(NVEC_POWER_POLLING_INTERVAL));
@@ -762,15 +803,12 @@ static void nvec_power_isr_work_func(struct work_struct *isr_work)
 		struct nvec_power, isr_work);
 
 	/* Update power supply status */
-	if (!nvec_power_update_status(power,true)) {
-		power_supply_changed(&nvec_bat_psy);
-		power_supply_changed(&nvec_ac_psy);
+	nvec_power_update_status(power,true);
 		
-		/* If battery is below minimun, force a kernel shutdown */
-		if (power->capacity_remain < power->critical_capacity) {
-			pr_info("Battery critically low. Calling kernel_power_off()!\n");
-			kernel_power_off();
-		}
+	/* If battery is below minimun, force a kernel shutdown */
+	if (power->capacity_remain < power->critical_capacity) {
+		pr_info("Battery critically low. Calling kernel_power_off()!\n");
+		kernel_power_off();
 	}
 		
 	enable_irq(power->low_batt_irq);
@@ -868,8 +906,11 @@ static int __devinit nvec_power_probe(struct platform_device *pdev)
 	power->notifier.notifier_call = nvec_power_notifier;
 	nvec_add_eventhandler(power->master, &power->notifier);
 
+	
+	/* The first time, we update the battery info as soon as possible */
+	power->next_update = jiffies;
 	queue_delayed_work(power->work_queue, &power->work,
-		 msecs_to_jiffies(NVEC_POWER_POLLING_INTERVAL));
+		 msecs_to_jiffies(100));
 
 	dev_info(&pdev->dev, "NvEC power controller driver registered\n");
 	
@@ -921,13 +962,12 @@ static int __devexit nvec_power_remove(struct platform_device *dev)
 
 static int nvec_power_resume(struct platform_device *dev)
 {
-	nvec_restart();
 	struct nvec_power *power = platform_get_drvdata(dev);
 	if (power->in_s3_state_gpio) 
 		gpio_set_value(power->in_s3_state_gpio,0);
+		
+	power->next_update = jiffies;
 	queue_delayed_work(power->work_queue, &power->work,
-		msecs_to_jiffies(NVEC_POWER_POLLING_INTERVAL));
-	queue_delayed_work(power->isr_wq, &power->work,
 		msecs_to_jiffies(NVEC_POWER_POLLING_INTERVAL));
 	return 0;
 }

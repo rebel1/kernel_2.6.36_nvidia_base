@@ -85,7 +85,7 @@ struct tps6586x_ec_ctx {
 	int battery_voltage;
 	int battery_temperature;
 	
-	int last_update;
+	unsigned long int last_update;
 	
 	int low_batt_irq;						/* If there is a low battery IRQ */
 	int use_irq;							/* if using a low battery irq */
@@ -204,7 +204,7 @@ static int tps6586x_get_adc_value(struct tps6586x_ec_ctx *charger,int channel, i
 		return ret;
 	
     // Wait for conversion
-	mdelay(26);
+	msleep(26);
 
     // Make sure the conversion is completed - check for ADC error.
     while (1)
@@ -353,7 +353,7 @@ static int tps6586x_update_status(struct tps6586x_ec_ctx *charger,bool force_upd
 	int ret;
 	
 	/* Do not accept to update too often */
-	if (!force_update && (charger->last_update - jiffies) >= 0)
+	if (!force_update && (int)(charger->last_update - jiffies) >= 0)
 		return 0;
 
 	/* get exclusive access to the accelerometer */
@@ -841,6 +841,7 @@ static int tps6586x_ec_probe(struct platform_device *pdev)
 	}
 	INIT_DELAYED_WORK(&charger->work, tps6586x_work_func);
 	
+	charger->last_update = jiffies;
 	queue_delayed_work(charger->work_queue, &charger->work,
 		 msecs_to_jiffies(TPS6586X_POLLING_INTERVAL));
 	
@@ -918,6 +919,8 @@ static int tps6586x_ec_resume(struct platform_device *dev)
 	struct tps6586x_ec_ctx *charger = platform_get_drvdata(dev);
 	if (charger->in_s3_state_gpio) 
 		gpio_set_value(charger->in_s3_state_gpio,0);
+		
+	charger->last_update = jiffies;
 	queue_delayed_work(charger->work_queue, &charger->work,
 		msecs_to_jiffies(TPS6586X_POLLING_INTERVAL));
 	return 0;
