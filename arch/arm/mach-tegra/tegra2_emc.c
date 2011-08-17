@@ -258,37 +258,54 @@ int tegra_emc_set_rate(unsigned long rate)
 void tegra_init_emc(const struct tegra_emc_chip *chips, int chips_size)
 {
 	int i;
-	int vid;
-	int rev_id1;
-	int rev_id2;
-	int pid;
+	int vid = 0;
+	int rev_id1 = 0;
+	int rev_id2 = 0;
+	int pid = 0;
 	int chip_matched = -1;
 
-	vid = tegra_emc_read_mrr(5);
-	rev_id1 = tegra_emc_read_mrr(6);
-	rev_id2 = tegra_emc_read_mrr(7);
-	pid = tegra_emc_read_mrr(8);
+	/* Avoid reading the memory identifier if not needed, as 
+	   it could cause lockups on old hw revisions of the
+	   tegra2 chip */
+	if (chips_size > 0 && 
+	
+		chips[0].mem_manufacturer_id == -1 &&
+		chips[0].mem_revision_id1 == -1 &&
+		chips[0].mem_revision_id2 == -1 &&
+		chips[0].mem_pid == -1) { 
+		
+		/* we will match with the first chip */
+		chip_matched = 0;
+		
+	} else {
+		
+		vid = tegra_emc_read_mrr(5);
+		rev_id1 = tegra_emc_read_mrr(6);
+		rev_id2 = tegra_emc_read_mrr(7);
+		pid = tegra_emc_read_mrr(8);
 
-	for (i = 0; i < chips_size; i++) {
-		if (chips[i].mem_manufacturer_id >= 0) {
-			if (chips[i].mem_manufacturer_id != vid)
-				continue;
-		}
-		if (chips[i].mem_revision_id1 >= 0) {
-			if (chips[i].mem_revision_id1 != rev_id1)
-				continue;
-		}
-		if (chips[i].mem_revision_id2 >= 0) {
-			if (chips[i].mem_revision_id2 != rev_id2)
-				continue;
-		}
-		if (chips[i].mem_pid >= 0) {
-			if (chips[i].mem_pid != pid)
-				continue;
-		}
 
-		chip_matched = i;
-		break;
+		for (i = 0; i < chips_size; i++) {
+			if (chips[i].mem_manufacturer_id >= 0) {
+				if (chips[i].mem_manufacturer_id != vid)
+					continue;
+			}
+			if (chips[i].mem_revision_id1 >= 0) {
+				if (chips[i].mem_revision_id1 != rev_id1)
+					continue;
+			}
+			if (chips[i].mem_revision_id2 >= 0) {
+				if (chips[i].mem_revision_id2 != rev_id2)
+					continue;
+			}
+			if (chips[i].mem_pid >= 0) {
+				if (chips[i].mem_pid != pid)
+					continue;
+			}
+
+			chip_matched = i;
+			break;
+		}
 	}
 
 	if (chip_matched >= 0) {

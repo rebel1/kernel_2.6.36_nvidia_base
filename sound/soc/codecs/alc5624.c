@@ -1541,9 +1541,9 @@ static int alc5624_hw_write(void* control_data,const char* data_in_s,int len)
 		unsigned int voll,volr;
 		u8 data[3];
 		
-		/* Get left and right volumes */
-		voll = (data_in[1] & 0x1F); /* hi */
-		volr = (data_in[2] & 0x1F); /* lo */
+		/* Get left and right volumes, and convert them, so 0 means lowest volume */
+		voll = 0x1F - (data_in[1] & 0x1F); /* hi */
+		volr = 0x1F - (data_in[2] & 0x1F); /* lo */
 		
 		/* Scale them */
 		voll = voll * alc5624->spkvol_scale / 100;
@@ -1555,8 +1555,8 @@ static int alc5624_hw_write(void* control_data,const char* data_in_s,int len)
 		
 		/* Recreate the value */
 		data[0] = ALC5624_SPK_OUT_VOL;
-		data[1] = (data_in[1] & 0xE0) | voll;
-		data[2] = (data_in[2] & 0xE0) | volr;
+		data[1] = (data_in[1] & 0xE0) | (0x1F - voll);
+		data[2] = (data_in[2] & 0xE0) | (0x1F - volr);
 
 		/* And write the main speaker volume */
 		return alc5624->bus_hw_write(alc5624->bus_control_data,data,3);
@@ -1716,7 +1716,7 @@ static int alc5624_set_bias_level(struct snd_soc_codec *codec,
 	
 			/* Reset the codec */
 			alc5624_reset(codec);
-			mdelay(1);
+			msleep(1);
 		
 			/* Sync registers to cache */
 			alc5624_sync_cache(codec);
@@ -1738,7 +1738,7 @@ static int alc5624_set_bias_level(struct snd_soc_codec *codec,
 			snd_soc_update_bits(codec, ALC5624_MISC_CTRL, 0x8000, 0x0000);
 			
 			/* Let it stabilize */
-			mdelay(10);
+			msleep(10);
 			
 			/* Disable fast Vref */
 			snd_soc_update_bits(codec, ALC5624_MISC_CTRL, 0x8000, 0x8000);
@@ -1852,9 +1852,9 @@ static unsigned int alc5624_hw_read(struct snd_soc_codec *codec,
 		tmpcodec.control_data = alc5624->bus_control_data;
 		reg2v = alc5624->bus_hw_read(&tmpcodec,reg);
 	
-		/* Get left and right volumes */
-		voll = (reg2v & 0x1F00) >> 8;
-		volr = (reg2v & 0x001F);
+		/* Get left and right volumes and make them inverse (0=minimum value)*/
+		voll = 0x1F - ((reg2v & 0x1F00) >> 8);
+		volr = 0x1F - ((reg2v & 0x001F));
 		
 		/* Inverse scale them */
 		voll = voll * 100 / alc5624->spkvol_scale;
@@ -1865,7 +1865,7 @@ static unsigned int alc5624_hw_read(struct snd_soc_codec *codec,
 		if (volr > 0x1F) volr = 0x1F;
 		
 		/* Recreate the value */
-		reg2v = (reg2v & 0xE0E0) | (volr) | (voll << 8);
+		reg2v = (reg2v & 0xE0E0) | (0x1F - volr) | ((0x1F - voll) << 8);
 		
 		/* And return the inversely scaled volume */
 		return reg2v;
@@ -1996,7 +1996,7 @@ static int alc5624_probe(struct snd_soc_codec *codec)
 	
 	/* Reset the codec */
 	alc5624_reset(codec);
-	mdelay(1);
+	msleep(1);
 
 	/* Fill cache with the default register values after reset*/
 	alc5624_fill_cache(codec);

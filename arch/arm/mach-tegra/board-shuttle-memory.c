@@ -854,7 +854,7 @@ static const struct tegra_emc_table shuttle_emc_tables[] = {
             0x00000000,   /* ODT_WRITE */
             0x00000000,   /* ODT_READ */
             0x00000083,   /* FBIO_CFG5 */
-            0x205A04AE,   /* CFG_DIG_DLL */
+            0xA04204AE,   /* CFG_DIG_DLL */
             0x007FD010,   /* DLL_XFORM_DQS */
             0x00000000,   /* DLL_XFORM_QUSE */
             0x00000000,   /* ZCAL_REF_CNT */
