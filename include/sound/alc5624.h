@@ -13,6 +13,7 @@
 /* Platform data required for the codec */
 struct alc5624_platform_data {
 	char* 			mclk;			/* The MCLK, that is required to make the codec work */
+	unsigned int	avdd_mv;		/* Analog vdd in millivolts */
 	unsigned int	spkvdd_mv;		/* Speaker Vdd in millivolts */
 	unsigned int	hpvdd_mv;		/* Headphone Vdd in millivolts */
 	unsigned int	spkvol_scale;	/* Speaker volume scaling: Reduces volume range to the percent specified */

@@ -541,6 +541,7 @@ struct alc5624_priv {
 	u16 reg_cache[REGISTER_COUNT];
 #endif
 	struct clk* 	mclk;			/* the master clock */
+	unsigned int	avdd_mv;		/* Analog vdd in millivolts */
 	unsigned int	spkvdd_mv;		/* Speaker Vdd in millivolts */
 	unsigned int	hpvdd_mv;		/* Headphone Vdd in millivolts */
 	unsigned int	spkvol_scale;	/* Speaker volume scaling: Reduces volume range to the percent specified */
@@ -1970,8 +1971,8 @@ static int alc5624_probe(struct snd_soc_codec *codec)
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 #endif
 	int ret,i;
-	int spkbias;
-	int hpbias;
+	int spkratio;
+	int hpratio;
 	unsigned long reg;
 
 	/* Get the default read and write functions for this bus */
@@ -2006,52 +2007,52 @@ static int alc5624_probe(struct snd_soc_codec *codec)
 		snd_soc_write(codec,alc5624_reg_default[i].reg,alc5624_reg_default[i].val);
 	}
 	
-	/* Configure amplifier bias voltages based on voltage supplies */
-	spkbias = alc5624->spkvdd_mv >> 1;
-	hpbias = alc5624->hpvdd_mv >> 1;
+	/* Configure amplifier bias ratio voltages based on voltage supplies */
+	spkratio = (alc5624->spkvdd_mv *100) / alc5624->avdd_mv;
+	hpratio  = (alc5624->hpvdd_mv * 100) / alc5624->avdd_mv;
 	reg = 0;
 	
-	/* Headphone amplifier bias */
-	if (hpbias >= 1500) {
-		reg |= (2 << 8); // HP = 1.5v bias
+	/* Headphone amplifier bias ratio */
+	if (hpratio >= 150) {
+		reg |= (2 << 8); // HP = 1.5x
 	} else
-	if (hpbias >= 1250) {
-		reg |= (1 << 8); // HP = 1.25v bias
-	} /* else 0=1v bias */
+	if (hpratio >= 125) {
+		reg |= (1 << 8); // HP = 1.25x
+	} /* else 0 = 1.0x */
 	
 	/* Speaker Class D amplifier bias */
-	if (spkbias <  1250) {
-		reg |= (3 << 6); // SPK class D bias: 1.0Vdd
+	if (spkratio < 125) {
+		reg |= (3 << 6); // SPK class D bias: 1.0x
 	} else
-	if (spkbias <  1500) {
-		reg |= (2 << 6); // SPK class D bias: 1.25Vdd
+	if (spkratio < 150) {
+		reg |= (2 << 6); // SPK class D bias: 1.25x
 	} else
-	if (spkbias <  1750) {
-		reg |= (1 << 6); // SPK class D bias: 1.5Vdd
-	} /* else 0=1.75v bias */
+	if (spkratio < 175) {
+		reg |= (1 << 6); // SPK class D bias: 1.5x
+	} /* else 0=1.75x */
 	
 	/* Speaker Class AB amplifier bias */
-	if (spkbias <  1250) {
-		reg |= (5 << 3); // SPK class AB bias: 1.0Vdd
+	if (spkratio < 125) {
+		reg |= (5 << 3); // SPK class AB bias: 1.0x
 	} else
-	if (spkbias <  1500) {
-		reg |= (4 << 3); // SPK class AB bias: 1.25Vdd
+	if (spkratio < 150) {
+		reg |= (4 << 3); // SPK class AB bias: 1.25x
 	} else
-	if (spkbias <  1750) {
-		reg |= (3 << 3); // SPK class AB bias: 1.5Vdd
+	if (spkratio < 175) {
+		reg |= (3 << 3); // SPK class AB bias: 1.5x
 	} else
-	if (spkbias <  2000) {
-		reg |= (2 << 3); // SPK class AB bias: 1.75Vdd
+	if (spkratio < 200) {
+		reg |= (2 << 3); // SPK class AB bias: 1.75x
 	} else
-	if (spkbias <  2250) {
-		reg |= (1 << 3); // SPK class AB bias: 2.0Vdd
+	if (spkratio < 225) {
+		reg |= (1 << 3); // SPK class AB bias: 2.0x
 	} /* else 0=2.25v bias */
 	
 	/* Set the amplifier biases */
 	snd_soc_update_bits(codec,ALC5624_GEN_CTRL_REG1, 0x03F8, reg);
 	
-	/* Enable strong amp if using spkbias >= 1.5v */
-	snd_soc_update_bits(codec, ALC5624_MISC_CTRL, 0x4000, (spkbias >= 1500) ? 0x0000 : 0x4000);
+	/* Enable strong amp if using spkvdd >= 3v */
+	snd_soc_update_bits(codec, ALC5624_MISC_CTRL, 0x4000, (alc5624->spkvdd_mv >= 3000) ? 0x0000 : 0x4000);
 	
 	/* Disable the codec MCLK */
 	clk_disable(alc5624->mclk);
@@ -2176,9 +2177,10 @@ static __devinit int alc5624_i2c_probe(struct i2c_client *client,
 	alc5624->mclk = mclk; 
 	
 	/* Store the supply voltages used for amplifiers */
-	alc5624->spkvdd_mv = pdata->spkvdd_mv;	/* Speaker Vdd in millivolts */
-	alc5624->hpvdd_mv  = pdata->hpvdd_mv;	/* Headphone Vdd in millivolts */
-	alc5624->spkvol_scale = pdata->spkvol_scale ? pdata->spkvol_scale : 100; /* store maximum volume scale */
+	alc5624->avdd_mv = pdata->avdd_mv ? pdata->avdd_mv : 3300;						/* Analog vdd in millivolts */
+	alc5624->spkvdd_mv = pdata->spkvdd_mv ? pdata->spkvdd_mv : alc5624->avdd_mv;	/* Speaker Vdd in millivolts */
+	alc5624->hpvdd_mv  = pdata->hpvdd_mv ? pdata->hpvdd_mv : alc5624->hpvdd_mv;		/* Headphone Vdd in millivolts */
+	alc5624->spkvol_scale = pdata->spkvol_scale ? pdata->spkvol_scale : 100; 		/* store maximum volume scale */
 
 	i2c_set_clientdata(client, alc5624);
 	alc5624->control_data = client;
