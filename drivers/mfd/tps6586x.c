@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2010 CompuLab Ltd.
  * Mike Rapoport <mike@compulab.co.il>
- *
+ * Copyright (C) 2011 Eduardo Jose Tagle
  * Based on da903x.c.
  * Copyright (C) 2008 Compulab, Ltd.
  * Mike Rapoport <mike@compulab.co.il>
@@ -550,7 +550,7 @@ static int __devinit tps6586x_i2c_probe(struct i2c_client *client,
 
 	/* make sure to first init the GPIO provider, so subdevs can count on it */
 	tps6586x_gpio_init(tps6586x, pdata->gpio_base);
-
+	
 	ret = tps6586x_add_subdevs(tps6586x, pdata);
 	if (ret) {
 		dev_err(&client->dev, "add devices failed: %d\n", ret);
