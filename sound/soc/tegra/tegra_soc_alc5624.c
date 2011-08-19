@@ -17,6 +17,8 @@
  */
  
 /* #define DEBUG */
+
+/* Shuttle uses MIC2 as the mic input */
  
 #include "tegra_soc.h"
 #include <linux/gpio.h>
@@ -611,8 +613,8 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"Internal Speaker", NULL, "SPKLN"},
 	{"Internal Speaker", NULL, "SPKR"},
 	{"Internal Speaker", NULL, "SPKRN"},
-	{"Mic Bias1", NULL, "Internal Mic"},
-	{"MIC1", NULL, "Mic Bias1"},
+	{"Mic Bias2", NULL, "Internal Mic"},
+	{"MIC2", NULL, "Mic Bias2"},
 };
 
 #ifdef SHUTTLE_MANUAL_CONTROL_OF_OUTPUTDEVICE
@@ -674,7 +676,7 @@ static int tegra_codec_init(struct snd_soc_codec *codec)
 		snd_soc_dapm_nc_pin(codec, "LINEL");
 		snd_soc_dapm_nc_pin(codec, "LINER");
 		snd_soc_dapm_nc_pin(codec, "PHONEIN");
-		snd_soc_dapm_nc_pin(codec, "MIC2");
+		snd_soc_dapm_nc_pin(codec, "MIC1");
 		snd_soc_dapm_nc_pin(codec, "MONO");
 
 		/* Set endpoints to default off mode */

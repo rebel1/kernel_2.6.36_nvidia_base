@@ -243,14 +243,22 @@ static struct tegra_audio_platform_data tegra_audio_pdata[] = {
 
 static struct alc5624_platform_data alc5624_pdata = {
 #if LINUX_VERSION_CODE == KERNEL_VERSION(2,6,36)
-	.mclk 			= "clk_dev1",
-#else	
-	.mclk 			= "cdev1",
+	.mclk 				= "clk_dev1",
+#else		
+	.mclk 				= "cdev1",
 #endif
-	.avdd_mv		= 3300,	/* Analog vdd in millivolts */
-	.spkvdd_mv 		= 5000,	/* Speaker Vdd in millivolts */
-	.hpvdd_mv 		= 3300,	/* Headphone Vdd in millivolts */
-	.spkvol_scale 	= 82,	/* Scale speaker volume to the percent of maximum range -Be careful: range is logarithmic! */
+	.avdd_mv			= 3300,	/* Analog vdd in millivolts */
+	.spkvdd_mv 			= 5000,	/* Speaker Vdd in millivolts */
+	.hpvdd_mv 			= 3300,	/* Headphone Vdd in millivolts */
+	.spkvol_scale 		= 80,	/* Scale speaker volume to the percent of maximum range -Be careful: range is logarithmic! */
+	
+	.mic1bias_mv		= 2970,	/* MIC1 bias voltage */
+	.mic2bias_mv		= 2970,	/* MIC2 bias voltage */
+	.mic1boost_db		= 40,	/* MIC1 gain boost */
+	.mic2boost_db		= 40,	/* MIC2 gain boost */
+	
+	.default_is_mic2 	= true,	/* Shuttle uses MIC2 as the default capture source */
+	
 };
 
 static struct i2c_board_info __initdata shuttle_i2c_bus0_board_info[] = {

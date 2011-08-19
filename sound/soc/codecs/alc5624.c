@@ -141,8 +141,8 @@
 /* Micphone Control define(0x22) */
 #define MIC1		1
 #define MIC2		2
-#define MIC_BIAS_90_PRECNET_AVDD	1
-#define	MIC_BIAS_75_PRECNET_AVDD	2
+#define MIC_BIAS_90_PERCNET_AVDD	1
+#define	MIC_BIAS_75_PERCNET_AVDD	2
 
 #define MIC1_BOOST_CONTROL_MASK		(0x3<<10)
 #define MIC1_BOOST_CONTROL_BYPASS	(0x0<<10)
@@ -546,6 +546,13 @@ struct alc5624_priv {
 	unsigned int	hpvdd_mv;		/* Headphone Vdd in millivolts */
 	unsigned int	spkvol_scale;	/* Speaker volume scaling: Reduces volume range to the percent specified */
 	
+	unsigned int	mic1bias_mv;	/* MIC1 bias voltage */
+	unsigned int	mic2bias_mv;	/* MIC2	bias voltage */
+	unsigned int	mic1boost_db;	/* MIC1 gain boost */
+	unsigned int	mic2boost_db;	/* MIC1 gain boost */
+	
+	bool			default_is_mic2;/* Default MIC used as input will be MIC2. Otherwise MIC1 is used */
+	
 	enum snd_soc_control_type control_type;
 	void *			control_data;
 	
@@ -573,7 +580,7 @@ static const struct {
 	{ALC5624_MIC_VOL					, 0x0808 }, /* Mic volume = 0db */
 	{ALC5624_MIC_ROUTING_CTRL			, 0xF0F0 }, /* Mute mic volume to Headphone, Speaker and Mono mixers, Differential mode enabled */
 	{ALC5624_ADC_REC_GAIN				, 0xF58B },
-	{ALC5624_ADC_REC_MIXER				, 0x3F3F }, /* Mic1 as recording sources */
+	{ALC5624_ADC_REC_MIXER				, 0x3F3F }, /* Mic1 as recording sources - will be overriden on init */
 	{ALC5624_OUTPUT_MIXER_CTRL			, 0x6B00 }, /* SPKL from HP mixer, Class D amplifier, SPKR from HP mixer, HPL from headphone mixer, HPR from headphone mixer, Mono from VMid */
 	{ALC5624_MIC_CTRL					, 0x0F02 }, /* 1.8uA short current det, Bias volt =0.9Avdd, +40db gain boost */
 	{ALC5624_PD_CTRL_STAT				, 0x0000 }, /* No powerdown */
@@ -679,44 +686,44 @@ SOC_DOUBLE_TLV("Rec Capture Volume", 		ALC5624_ADC_REC_GAIN, 7, 0, 31, 0, capvol
 
 /* Left Headphone Mixers */
 static const struct snd_kcontrol_new alc5624_hpl_mixer_controls[] = {
-SOC_DAPM_SINGLE("LI2HP Playback Switch", VIRTUAL_HPL_MIXER, 4, 1, 0),
-SOC_DAPM_SINGLE("PHO2HP Playback Switch", VIRTUAL_HPL_MIXER, 3, 1, 0),
-SOC_DAPM_SINGLE("MIC12HP Playback Switch", VIRTUAL_HPL_MIXER, 2, 1, 0),
-SOC_DAPM_SINGLE("MIC22HP Playback Switch", VIRTUAL_HPL_MIXER, 1, 1, 0),
-SOC_DAPM_SINGLE("DAC2HP Playback Switch", VIRTUAL_HPL_MIXER, 0, 1, 0),
-SOC_DAPM_SINGLE("ADCL2HP Playback Switch", ALC5624_ADC_REC_GAIN, 15, 1, 1),
+SOC_DAPM_SINGLE("LI2HPL Playback Switch", VIRTUAL_HPL_MIXER, 4, 1, 0),
+SOC_DAPM_SINGLE("PHO2HPL Playback Switch", VIRTUAL_HPL_MIXER, 3, 1, 0),
+SOC_DAPM_SINGLE("MIC12HPL Playback Switch", VIRTUAL_HPL_MIXER, 2, 1, 0),
+SOC_DAPM_SINGLE("MIC22HPL Playback Switch", VIRTUAL_HPL_MIXER, 1, 1, 0),
+SOC_DAPM_SINGLE("DAC2HPL Playback Switch", VIRTUAL_HPL_MIXER, 0, 1, 0),
+SOC_DAPM_SINGLE("ADCL2HPL Playback Switch", ALC5624_ADC_REC_GAIN, 15, 1, 1),
 };
 
 /* Right Headphone Mixers */
 static const struct snd_kcontrol_new alc5624_hpr_mixer_controls[] = {
-SOC_DAPM_SINGLE("LI2HP Playback Switch", VIRTUAL_HPR_MIXER, 4, 1, 0),
-SOC_DAPM_SINGLE("PHO2HP Playback Switch", VIRTUAL_HPR_MIXER, 3, 1, 0),
-SOC_DAPM_SINGLE("MIC12HP Playback Switch", VIRTUAL_HPR_MIXER, 2, 1, 0),
-SOC_DAPM_SINGLE("MIC22HP Playback Switch", VIRTUAL_HPR_MIXER, 1, 1, 0),
-SOC_DAPM_SINGLE("DAC2HP Playback Switch", VIRTUAL_HPR_MIXER, 0, 1, 0),
-SOC_DAPM_SINGLE("ADCR2HP Playback Switch", ALC5624_ADC_REC_GAIN, 14, 1, 1),
+SOC_DAPM_SINGLE("LI2HPR Playback Switch", VIRTUAL_HPR_MIXER, 4, 1, 0),
+SOC_DAPM_SINGLE("PHO2HPR Playback Switch", VIRTUAL_HPR_MIXER, 3, 1, 0),
+SOC_DAPM_SINGLE("MIC12HPR Playback Switch", VIRTUAL_HPR_MIXER, 2, 1, 0),
+SOC_DAPM_SINGLE("MIC22HPR Playback Switch", VIRTUAL_HPR_MIXER, 1, 1, 0),
+SOC_DAPM_SINGLE("DAC2HPR Playback Switch", VIRTUAL_HPR_MIXER, 0, 1, 0),
+SOC_DAPM_SINGLE("ADCR2HPR Playback Switch", ALC5624_ADC_REC_GAIN, 14, 1, 1),
 };
 
 //Left Record Mixer
 static const struct snd_kcontrol_new alc5624_captureL_mixer_controls[] = {
-SOC_DAPM_SINGLE("Mic1 Capture Switch", ALC5624_ADC_REC_MIXER, 14, 1, 1),
-SOC_DAPM_SINGLE("Mic2 Capture Switch", ALC5624_ADC_REC_MIXER, 13, 1, 1),
+SOC_DAPM_SINGLE("Mic1L Capture Switch", ALC5624_ADC_REC_MIXER, 14, 1, 1),
+SOC_DAPM_SINGLE("Mic2L Capture Switch", ALC5624_ADC_REC_MIXER, 13, 1, 1),
 SOC_DAPM_SINGLE("LineInL Capture Switch",ALC5624_ADC_REC_MIXER,12, 1, 1),
-SOC_DAPM_SINGLE("Phone Capture Switch", ALC5624_ADC_REC_MIXER, 11, 1, 1),
+SOC_DAPM_SINGLE("PhoneL Capture Switch", ALC5624_ADC_REC_MIXER, 11, 1, 1),
 SOC_DAPM_SINGLE("HPMixerL Capture Switch", ALC5624_ADC_REC_MIXER,10, 1, 1),
-SOC_DAPM_SINGLE("SPKMixer Capture Switch",ALC5624_ADC_REC_MIXER,9, 1, 1),
-SOC_DAPM_SINGLE("MonoMixer Capture Switch",ALC5624_ADC_REC_MIXER,8, 1, 1),
+SOC_DAPM_SINGLE("SPKMixerL Capture Switch",ALC5624_ADC_REC_MIXER,9, 1, 1),
+SOC_DAPM_SINGLE("MonoMixerL Capture Switch",ALC5624_ADC_REC_MIXER,8, 1, 1),
 };
 
 //Right Record Mixer
 static const struct snd_kcontrol_new alc5624_captureR_mixer_controls[] = {
-SOC_DAPM_SINGLE("Mic1 Capture Switch", ALC5624_ADC_REC_MIXER, 6, 1, 1),
-SOC_DAPM_SINGLE("Mic2 Capture Switch", ALC5624_ADC_REC_MIXER, 5, 1, 1),
+SOC_DAPM_SINGLE("Mic1R Capture Switch", ALC5624_ADC_REC_MIXER, 6, 1, 1),
+SOC_DAPM_SINGLE("Mic2R Capture Switch", ALC5624_ADC_REC_MIXER, 5, 1, 1),
 SOC_DAPM_SINGLE("LineInR Capture Switch",ALC5624_ADC_REC_MIXER,4, 1, 1),
-SOC_DAPM_SINGLE("Phone Capture Switch", ALC5624_ADC_REC_MIXER, 3, 1, 1),
+SOC_DAPM_SINGLE("PhoneR Capture Switch", ALC5624_ADC_REC_MIXER, 3, 1, 1),
 SOC_DAPM_SINGLE("HPMixerR Capture Switch", ALC5624_ADC_REC_MIXER,2, 1, 1),
-SOC_DAPM_SINGLE("SPKMixer Capture Switch",ALC5624_ADC_REC_MIXER,1, 1, 1),
-SOC_DAPM_SINGLE("MonoMixer Capture Switch",ALC5624_ADC_REC_MIXER,0, 1, 1),
+SOC_DAPM_SINGLE("SPKMixerR Capture Switch",ALC5624_ADC_REC_MIXER,1, 1, 1),
+SOC_DAPM_SINGLE("MonoMixerR Capture Switch",ALC5624_ADC_REC_MIXER,0, 1, 1),
 };
 
 /* Speaker Mixer */
@@ -912,20 +919,20 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"HP Mixer", NULL, "Right HP Mixer"},
 
 	/* left HP mixer */
-	{"Left HP Mixer", "LI2HP Playback Switch", "LINEL"},
-	{"Left HP Mixer", "PHO2HP Playback Switch","PHONEIN"},
-	{"Left HP Mixer", "MIC12HP Playback Switch","MIC1"},
-	{"Left HP Mixer", "MIC22HP Playback Switch","MIC2"},
-	{"Left HP Mixer", "DAC2HP Playback Switch","Left DAC"},
-	{"Left HP Mixer", "ADCL2HP Playback Switch","Left Record Mixer"},
+	{"Left HP Mixer", "LI2HPL Playback Switch", "LINEL"},
+	{"Left HP Mixer", "PHO2HPL Playback Switch","PHONEIN"},
+	{"Left HP Mixer", "MIC12HPL Playback Switch","MIC1"},
+	{"Left HP Mixer", "MIC22HPL Playback Switch","MIC2"},
+	{"Left HP Mixer", "DAC2HPL Playback Switch","Left DAC"},
+	{"Left HP Mixer", "ADCL2HPL Playback Switch","Left Record Mixer"},
 	
 	/* right HP mixer */
-	{"Right HP Mixer", "LI2HP Playback Switch", "LINER"},
-	{"Right HP Mixer", "PHO2HP Playback Switch","PHONEIN"},
-	{"Right HP Mixer", "MIC12HP Playback Switch","MIC1"},
-	{"Right HP Mixer", "MIC22HP Playback Switch","MIC2"},
-	{"Right HP Mixer", "DAC2HP Playback Switch","Right DAC"},
-	{"Right HP Mixer", "ADCR2HP Playback Switch","Right Record Mixer"},
+	{"Right HP Mixer", "LI2HPR Playback Switch", "LINER"},
+	{"Right HP Mixer", "PHO2HPR Playback Switch","PHONEIN"},
+	{"Right HP Mixer", "MIC12HPR Playback Switch","MIC1"},
+	{"Right HP Mixer", "MIC22HPR Playback Switch","MIC2"},
+	{"Right HP Mixer", "DAC2HPR Playback Switch","Right DAC"},
+	{"Right HP Mixer", "ADCR2HPR Playback Switch","Right Record Mixer"},
 	
 	/* speaker mixer */
 	{"Speaker Mixer", "LI2SPK Playback Switch","Line Mixer"},
@@ -943,22 +950,22 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"Mono Mixer", "ADC2MONO_R Playback Switch","Right Record Mixer"},
 	
 	/*Left record mixer */
-	{"Left Record Mixer", "Mic1 Capture Switch","Mic 1 Pre Amp"},
-	{"Left Record Mixer", "Mic2 Capture Switch","Mic 2 Pre Amp"},
+	{"Left Record Mixer", "Mic1L Capture Switch","Mic 1 Pre Amp"},
+	{"Left Record Mixer", "Mic2L Capture Switch","Mic 2 Pre Amp"},
 	{"Left Record Mixer", "LineInL Capture Switch","LINEL"},
-	{"Left Record Mixer", "Phone Capture Switch","PHONEIN"},
+	{"Left Record Mixer", "PhoneL Capture Switch","PHONEIN"},
 	{"Left Record Mixer", "HPMixerL Capture Switch","Left HP Mixer"},
-	{"Left Record Mixer", "SPKMixer Capture Switch","Speaker Mixer"},
-	{"Left Record Mixer", "MonoMixer Capture Switch","Mono Mixer"},
+	{"Left Record Mixer", "SPKMixerL Capture Switch","Speaker Mixer"},
+	{"Left Record Mixer", "MonoMixerL Capture Switch","Mono Mixer"},
 	
 	/*Right record mixer */
-	{"Right Record Mixer", "Mic1 Capture Switch","Mic 1 Pre Amp"},
-	{"Right Record Mixer", "Mic2 Capture Switch","Mic 2 Pre Amp"},
+	{"Right Record Mixer", "Mic1R Capture Switch","Mic 1 Pre Amp"},
+	{"Right Record Mixer", "Mic2R Capture Switch","Mic 2 Pre Amp"},
 	{"Right Record Mixer", "LineInR Capture Switch","LINER"},
-	{"Right Record Mixer", "Phone Capture Switch","PHONEIN"},
+	{"Right Record Mixer", "PhoneR Capture Switch","PHONEIN"},
 	{"Right Record Mixer", "HPMixerR Capture Switch","Right HP Mixer"},
-	{"Right Record Mixer", "SPKMixer Capture Switch","Speaker Mixer"},
-	{"Right Record Mixer", "MonoMixer Capture Switch","Mono Mixer"},	
+	{"Right Record Mixer", "SPKMixerR Capture Switch","Speaker Mixer"},
+	{"Right Record Mixer", "MonoMixerR Capture Switch","Mono Mixer"},	
 
 	/* headphone left mux */
 	{"Left Headphone Out Mux", "HPL Mixer", "Left HP Mixer"},
@@ -1973,6 +1980,8 @@ static int alc5624_probe(struct snd_soc_codec *codec)
 	int ret,i;
 	int spkratio;
 	int hpratio;
+	int mic1ratio;
+	int mic2ratio;
 	unsigned long reg;
 
 	/* Get the default read and write functions for this bus */
@@ -2053,6 +2062,26 @@ static int alc5624_probe(struct snd_soc_codec *codec)
 	
 	/* Enable strong amp if using spkvdd >= 3v */
 	snd_soc_update_bits(codec, ALC5624_MISC_CTRL, 0x4000, (alc5624->spkvdd_mv >= 3000) ? 0x0000 : 0x4000);
+	
+	/* Configure MIC bias levels and gains */
+	mic1ratio = (alc5624->mic1bias_mv * 100) / alc5624->avdd_mv;
+	mic2ratio = (alc5624->mic2bias_mv * 100) / alc5624->avdd_mv;
+	reg = 0;
+	if (mic1ratio <= 75) reg |= (1 << 5);
+	if (mic2ratio <= 75) reg |= (1 << 4);
+	if (alc5624->mic1boost_db >= 40) 		reg |= (3 << 10);
+	else if (alc5624->mic1boost_db >= 30) 	reg |= (2 << 10);
+	else if (alc5624->mic1boost_db >= 20) 	reg |= (1 << 10);
+	if (alc5624->mic2boost_db >= 40) 		reg |= (3 << 8);
+	else if (alc5624->mic2boost_db >= 30) 	reg |= (2 << 8);
+	else if (alc5624->mic2boost_db >= 20) 	reg |= (1 << 8);
+	
+	/* Write the MIC configuration */
+	snd_soc_update_bits(codec, ALC5624_MIC_CTRL, 0x0F30, reg);
+	
+	/* Select the default MIC source */
+	snd_soc_update_bits(codec, ALC5624_ADC_REC_MIXER, 0x6060, 
+		(alc5624->default_is_mic2) ? 0x4040 : 0x2020 );
 	
 	/* Disable the codec MCLK */
 	clk_disable(alc5624->mclk);
@@ -2182,6 +2211,15 @@ static __devinit int alc5624_i2c_probe(struct i2c_client *client,
 	alc5624->hpvdd_mv  = pdata->hpvdd_mv ? pdata->hpvdd_mv : alc5624->hpvdd_mv;		/* Headphone Vdd in millivolts */
 	alc5624->spkvol_scale = pdata->spkvol_scale ? pdata->spkvol_scale : 100; 		/* store maximum volume scale */
 
+	/* And the settings used for mics */
+	alc5624->mic1bias_mv = pdata->mic1bias_mv;			/* MIC1 bias voltage */
+	alc5624->mic2bias_mv = pdata->mic2bias_mv;			/* MIC2	bias voltage */
+	alc5624->mic1boost_db = pdata->mic1boost_db;		/* MIC1 gain boost */
+	alc5624->mic2boost_db = pdata->mic2boost_db;		/* MIC2 gain boost */
+	alc5624->default_is_mic2 = pdata->default_is_mic2;	/* If MIC2 is the default MIC or not */
+	
+	
+	
 	i2c_set_clientdata(client, alc5624);
 	alc5624->control_data = client;
 	alc5624->control_type = SND_SOC_I2C;
