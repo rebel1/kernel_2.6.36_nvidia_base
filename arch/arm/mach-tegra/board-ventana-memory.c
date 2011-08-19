@@ -59,11 +59,11 @@ static const struct tegra_emc_table ventana_emc_tables_elpida_300Mhz[] = {
 			0x00000006,   /* TCLKSTABLE */
 			0x00000002,   /* TCLKSTOP */
 			0x00000068,   /* TREFBW */
-			0x00000003,   /* QUSE_EXTRA */
+			0x00000000,   /* QUSE_EXTRA */
 			0x00000003,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xa06a04ae,   /* CFG_DIG_DLL */
 			0x0001f000,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -110,11 +110,11 @@ static const struct tegra_emc_table ventana_emc_tables_elpida_300Mhz[] = {
 			0x00000006,   /* TCLKSTABLE */
 			0x00000002,   /* TCLKSTOP */
 			0x000000d0,   /* TREFBW */
-			0x00000004,   /* QUSE_EXTRA */
+			0x00000000,   /* QUSE_EXTRA */
 			0x00000000,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xa06a04ae,   /* CFG_DIG_DLL */
 			0x0001f000,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -161,11 +161,11 @@ static const struct tegra_emc_table ventana_emc_tables_elpida_300Mhz[] = {
 			0x00000006,   /* TCLKSTABLE */
 			0x00000002,   /* TCLKSTOP */
 			0x00000138,   /* TREFBW */
-			0x00000004,   /* QUSE_EXTRA */
+			0x00000000,   /* QUSE_EXTRA */
 			0x00000000,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xa06a04ae,   /* CFG_DIG_DLL */
 			0x0001f000,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -216,7 +216,7 @@ static const struct tegra_emc_table ventana_emc_tables_elpida_300Mhz[] = {
 			0x00000001,   /* FBIO_CFG6 */
 			0x00000000,   /* ODT_WRITE */
 			0x00000000,   /* ODT_READ */
-			0x00000082,   /* FBIO_CFG5 */
+			0x00000282,   /* FBIO_CFG5 */
 			0xA04C04AE,   /* CFG_DIG_DLL */
 			0x007FC010,   /* DLL_XFORM_DQS */
 			0x00000000,   /* DLL_XFORM_QUSE */
@@ -563,19 +563,30 @@ static const struct tegra_emc_chip ventana_t25_emc_chips[] = {
 	},
 };
 
+static const struct tegra_emc_chip ventana_siblings_emc_chips[] = {
+};
+
 #define TEGRA25_SKU		0x0B00
+#define board_is_ventana(bi) (bi.board_id == 0x24b || bi.board_id == 0x252)
 
 int ventana_emc_init(void)
 {
 	struct board_info BoardInfo;
 
 	tegra_get_board_info(&BoardInfo);
-	if (BoardInfo.sku == TEGRA25_SKU) {
-		tegra_init_emc(ventana_t25_emc_chips,
-			ARRAY_SIZE(ventana_t25_emc_chips));
+
+	if (board_is_ventana(BoardInfo)) {
+		if (BoardInfo.sku == TEGRA25_SKU)
+			tegra_init_emc(ventana_t25_emc_chips,
+				       ARRAY_SIZE(ventana_t25_emc_chips));
+		else
+			tegra_init_emc(ventana_emc_chips,
+				       ARRAY_SIZE(ventana_emc_chips));
 	} else {
-		tegra_init_emc(ventana_emc_chips,
-			ARRAY_SIZE(ventana_emc_chips));
+		pr_info("ventana_emc_init: using ventana_siblings_emc_chips\n");
+		tegra_init_emc(ventana_siblings_emc_chips,
+			       ARRAY_SIZE(ventana_siblings_emc_chips));
 	}
+
 	return 0;
 }
