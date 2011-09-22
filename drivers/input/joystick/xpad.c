@@ -162,7 +162,8 @@ static const struct xpad_device {
 	{ 0x0f0d, 0x0016, "Hori Real Arcade Pro.EX", MAP_TRIGGERS_TO_BUTTONS, XTYPE_XBOX360 },
 	{ 0x0f0d, 0x000d, "Hori Fighting Stick EX2", MAP_TRIGGERS_TO_BUTTONS, XTYPE_XBOX360 },
 	{ 0xffff, 0xffff, "Chinese-made Xbox Controller", 0, XTYPE_XBOX },
-	{ 0x0000, 0x0000, "Generic X-Box pad", 0, XTYPE_UNKNOWN }
+	{ 0x0000, 0x0000, "Generic X-Box pad", 0, XTYPE_UNKNOWN },
+	{ 0x162e, 0xbeef, "Joytech Neo-Se Take2", 0, XTYPE_XBOX360 }
 };
 
 /* buttons shared with xbox and xbox360 */
@@ -240,6 +241,7 @@ static struct usb_device_id xpad_table [] = {
 	XPAD_XBOX360_VENDOR(0x146b),		/* BigBen Interactive Controllers */
 	XPAD_XBOX360_VENDOR(0x1bad),		/* Rock Band Drums */
 	XPAD_XBOX360_VENDOR(0x0f0d),            /* Hori Controllers */
+	XPAD_XBOX360_VENDOR(0x162e),            /* Joytech Neo-Se X-Box 360 controllers */
 	{ }
 };
 
