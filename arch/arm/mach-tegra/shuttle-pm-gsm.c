@@ -26,7 +26,6 @@
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <asm/setup.h>
-#include <linux/regulator/consumer.h>
 #include <linux/err.h>
 #include <linux/mutex.h>
 #include <linux/random.h>
@@ -40,7 +39,6 @@
 #include <asm/mach-types.h>
 
 struct shuttle_pm_gsm_data {
-	struct regulator *regulator[2];
 	struct rfkill *rfkill;
 #ifdef CONFIG_PM
 	int pre_resume_state;
@@ -60,9 +58,6 @@ static void __shuttle_pm_gsm_toggle_radio(struct device *dev, unsigned int on)
 	
 	if (on) {
 	
-		regulator_enable(gsm_data->regulator[0]);
-		regulator_enable(gsm_data->regulator[1]);
-	
 		/* 3G/GPS power on sequence */
 		shuttle_3g_gps_poweron();
 
@@ -70,8 +65,6 @@ static void __shuttle_pm_gsm_toggle_radio(struct device *dev, unsigned int on)
 	
 		shuttle_3g_gps_poweroff();
 				
-		regulator_disable(gsm_data->regulator[1]);
-		regulator_disable(gsm_data->regulator[0]);
 	}
 	
 	/* store new state */
@@ -140,10 +133,10 @@ static ssize_t gsm_write(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static DEVICE_ATTR(power_on, 0644, gsm_read, gsm_write);
-static DEVICE_ATTR(reset, 0644, gsm_read, gsm_write);
+static DEVICE_ATTR(power_on, 0666, gsm_read, gsm_write);
+static DEVICE_ATTR(reset, 0666, gsm_read, gsm_write);
 #ifdef CONFIG_PM
-static DEVICE_ATTR(keep_on_in_suspend, 0644, gsm_read, gsm_write);
+static DEVICE_ATTR(keep_on_in_suspend, 0666, gsm_read, gsm_write);
 #endif
 
 
@@ -196,7 +189,6 @@ static int __init shuttle_gsm_probe(struct platform_device *pdev)
 	const int default_blocked_state = 0;
 
 	struct rfkill *rfkill;
-	struct regulator *regulator[2];
 	struct shuttle_pm_gsm_data *gsm_data;
 	int ret;
 
@@ -207,27 +199,13 @@ static int __init shuttle_gsm_probe(struct platform_device *pdev)
 	}
 	dev_set_drvdata(&pdev->dev, gsm_data);
 
-	regulator[0] = regulator_get(&pdev->dev, "avdd_usb_pll");
-	if (IS_ERR(regulator[0])) {
-		dev_err(&pdev->dev, "unable to get regulator for usb pll\n");
+	ret = shuttle_3g_gps_init();
+	if (ret) {
+		dev_err(&pdev->dev, "unable to init gps/gsm module\n");
 		kfree(gsm_data);
 		dev_set_drvdata(&pdev->dev, NULL);
-		return -ENODEV;
+		return ret;
 	}
-	gsm_data->regulator[0] = regulator[0];
-
-	regulator[1] = regulator_get(&pdev->dev, "avdd_usb");
-	if (IS_ERR(regulator[1])) {
-		dev_err(&pdev->dev, "unable to get regulator for usb\n");
-		regulator_put(regulator[0]);
-		kfree(gsm_data);
-		dev_set_drvdata(&pdev->dev, NULL);
-		return -ENODEV;
-	}
-	gsm_data->regulator[1] = regulator[1];
-	
-	/* Init control pins */
-	shuttle_3g_gps_init();
 
 	/* register rfkill interface */
 	rfkill = rfkill_alloc(pdev->name, &pdev->dev, RFKILL_TYPE_WWAN,
@@ -235,8 +213,7 @@ static int __init shuttle_gsm_probe(struct platform_device *pdev)
 
 	if (!rfkill) {
 		dev_err(&pdev->dev, "Failed to allocate rfkill\n");
-		regulator_put(regulator[1]);
-		regulator_put(regulator[0]);
+		shuttle_3g_gps_deinit();
 		kfree(gsm_data);
 		dev_set_drvdata(&pdev->dev, NULL);
 		return -ENOMEM;
@@ -251,8 +228,7 @@ static int __init shuttle_gsm_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to register rfkill\n");
 		rfkill_destroy(rfkill);		
-		regulator_put(regulator[1]);
-		regulator_put(regulator[0]);
+		shuttle_3g_gps_deinit();
 		kfree(gsm_data);
 		dev_set_drvdata(&pdev->dev, NULL);
 		return ret;
@@ -276,8 +252,7 @@ static int shuttle_gsm_remove(struct platform_device *pdev)
 
 	__shuttle_pm_gsm_toggle_radio(&pdev->dev, 0);
 
-	regulator_put(gsm_data->regulator[0]);
-	regulator_put(gsm_data->regulator[1]);
+	shuttle_3g_gps_deinit();
 
 	kfree(gsm_data);
 	dev_set_drvdata(&pdev->dev, NULL);

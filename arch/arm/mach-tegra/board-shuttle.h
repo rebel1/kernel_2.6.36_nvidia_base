@@ -110,7 +110,13 @@
 
 extern void shuttle_3g_gps_poweron(void);
 extern void shuttle_3g_gps_poweroff(void);
-extern void shuttle_3g_gps_init(void);
+extern int shuttle_3g_gps_init(void);
+extern void shuttle_3g_gps_deinit(void);
+
+extern void shuttle_wlan_bt_poweron(void);
+extern void shuttle_wlan_bt_poweroff(void);
+extern int shuttle_wlan_bt_init(void);
+extern void shuttle_wlan_bt_deinit(void);
 
 extern void shuttle_wifi_set_cd(int val);
 

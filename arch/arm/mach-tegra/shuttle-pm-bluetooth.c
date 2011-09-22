@@ -42,8 +42,6 @@
 #include <asm/mach-types.h>
 
 struct shuttle_pm_bt_data {
-	struct regulator *regulator;
-	struct clk *clk;
 	struct rfkill *rfkill;
 #ifdef CONFIG_PM	
 	int pre_resume_state;
@@ -63,23 +61,13 @@ static void __shuttle_pm_bt_toggle_radio(struct device *dev, unsigned int on)
 	
 	if (on) {
 		dev_info(dev, "Enabling Bluetooth\n");
-	
-		regulator_enable(bt_data->regulator);
-		clk_enable(bt_data->clk);
-	
-		/* Bluetooth power on sequence */
-		gpio_set_value(SHUTTLE_BT_RESET, 0); /* Assert reset */
-		msleep(200);
-		gpio_set_value(SHUTTLE_BT_RESET, 1); /* Deassert reset */
-		msleep(2);
+
+		shuttle_wlan_bt_poweron();
 
 	} else {
 		dev_info(dev, "Disabling Bluetooth\n");
-		
-		gpio_set_value(SHUTTLE_BT_RESET, 0); /* Assert reset */
-		
-		clk_disable(bt_data->clk);
-		regulator_disable(bt_data->regulator);
+
+		shuttle_wlan_bt_poweroff();
 	}
 	
 	/* store new state */
@@ -147,10 +135,10 @@ static ssize_t bt_write(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static DEVICE_ATTR(power_on, 0644, bt_read, bt_write);
-static DEVICE_ATTR(reset, 0644, bt_read, bt_write);
+static DEVICE_ATTR(power_on, 0666, bt_read, bt_write);
+static DEVICE_ATTR(reset, 0666, bt_read, bt_write);
 #ifdef CONFIG_PM
-static DEVICE_ATTR(keep_on_in_suspend, 0644, bt_read, bt_write);
+static DEVICE_ATTR(keep_on_in_suspend, 0666, bt_read, bt_write);
 #endif
 
 #ifdef CONFIG_PM
@@ -203,8 +191,6 @@ static int __init shuttle_bt_probe(struct platform_device *pdev)
 	const int default_blocked_state = 0;
 
 	struct rfkill *rfkill;
-	struct regulator *regulator;
-	struct clk *clk;
 	struct shuttle_pm_bt_data *bt_data;
 	int ret;
 
@@ -217,36 +203,20 @@ static int __init shuttle_bt_probe(struct platform_device *pdev)
 	}
 	dev_set_drvdata(&pdev->dev, bt_data);
 
-	regulator = regulator_get(&pdev->dev, "vddhostif_bt");
-	if (IS_ERR(regulator)) {
-		dev_err(&pdev->dev, "Failed to get regulator\n");
+	ret = shuttle_wlan_bt_init();
+	if (ret) {
+		dev_err(&pdev->dev, "unable to init wlan/bt module\n");
 		kfree(bt_data);
 		dev_set_drvdata(&pdev->dev, NULL);
 		return -ENODEV;
 	}
-	bt_data->regulator = regulator;
-	
-	clk = clk_get(&pdev->dev, "blink");
-	if (IS_ERR(clk)) {
-		dev_err(&pdev->dev, "Failed to get clock\n");
-		regulator_put(regulator);
-		kfree(bt_data);
-		dev_set_drvdata(&pdev->dev, NULL);
-		return -ENODEV;
-	}
-	bt_data->clk = clk;
 
-	/* Init io pins */
-	gpio_request(SHUTTLE_BT_RESET, "bluetooth_reset");
-	gpio_direction_output(SHUTTLE_BT_RESET, 0);
-	
 	rfkill = rfkill_alloc(pdev->name, &pdev->dev, RFKILL_TYPE_BLUETOOTH,
                             &shuttle_bt_rfkill_ops, &pdev->dev);
 
 	if (!rfkill) {
 		dev_err(&pdev->dev, "Failed to allocate rfkill\n");
-		clk_put(clk);
-		regulator_put(regulator);
+		shuttle_wlan_bt_deinit();
 		kfree(bt_data);
 		dev_set_drvdata(&pdev->dev, NULL);
 		return -ENOMEM;
@@ -262,8 +232,7 @@ static int __init shuttle_bt_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to register rfkill\n");
 		rfkill_destroy(rfkill);
-		clk_put(clk);
-		regulator_put(regulator);
+		shuttle_wlan_bt_deinit();		
 		kfree(bt_data);
 		dev_set_drvdata(&pdev->dev, NULL);
 		return ret;
@@ -287,8 +256,7 @@ static int shuttle_bt_remove(struct platform_device *pdev)
 
 	__shuttle_pm_bt_toggle_radio(&pdev->dev, 0);
 
-	regulator_put(bt_data->regulator);
-	clk_put(bt_data->clk);
+	shuttle_wlan_bt_deinit();		
 
 	kfree(bt_data);
 	dev_set_drvdata(&pdev->dev, NULL);

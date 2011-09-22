@@ -2,8 +2,6 @@
  * BMA150/SMB380 linux driver
  *  Copyright (C) 2011 Eduardo José Tagle <ejtagle@tutopia.com> 
  *  Copyright (C) 2009 Bosch Sensortec GmbH
- *  Authors:	Eduardo José Tagle   <ejtagle@tutopia.com>
- *		Rene Bensch "rebel1" <rene.bensch@googlemail,com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -39,11 +37,6 @@
 #include <linux/delay.h>
 #include <linux/miscdevice.h>
 #include <linux/input.h>
-#include <linux/gpio.h>
-
-#define TEGRA_GPIO_GSENSOR_TOGGLE       57
-#define xy_flip
-static int temp1;
 
 /** BMA150 acceleration data 
 	\brief Structure containing acceleration values for x,y and z-axis in signed short
@@ -567,6 +560,8 @@ struct bma150ctx {
 #define BMA150_CONF1_INT_MSK	((1<<BMA150_ALERT__POS) | (1<<BMA150_EN_ANY_MOTION__POS) | (1<<BMA150_ENABLE_HG__POS) | (1<<BMA150_ENABLE_LG__POS))
 #define BMA150_CONF2_INT_MSK	((1<<BMA150_ENABLE_ADV_INT__POS) | (1<<BMA150_NEW_DATA_INT__POS) | (1<<BMA150_LATCH_INT__POS))
 
+/*#define xy_flip*/
+static int temp1;
 /*	i2c write routine for bma150	*/
 static int bma150_i2c_write(struct bma150ctx *ctx, unsigned char reg_addr, unsigned char *data, unsigned char len)
 {
@@ -628,7 +623,6 @@ static int bma150_init(struct bma150ctx *ctx)
 
 	/* If device not found, say so now */
 	return (ctx->chip_id == 0x02) ? 0 : -ENODEV;
-
 }
 
 /** Perform soft reset of BMA150 via bus command
@@ -1234,29 +1228,6 @@ static int bma150_read_temperature(struct bma150ctx *ctx, unsigned char *temp)
 */
 static int bma150_read_accel_xyz(struct bma150ctx *ctx, bma150acc_t * acc)
 {
-	static int counter = 0;
-	static int toggle = 1;
-	int new_toggle;
-	// start GSENSOR Toggle with GPIO
-		if( counter % 25 == 0 ) {
-		 new_toggle = gpio_get_value( TEGRA_GPIO_GSENSOR_TOGGLE );
-		 if(new_toggle == 0)
-			{
-			new_toggle = 1 ;
-			} else {
-			new_toggle = 0 ;
-			}
-			if( toggle != new_toggle ) {
-			toggle = new_toggle;
-			printk(KERN_INFO "[SHUTTLE] GPIO:%d = %d Set GSENSOR MODE: [%s]\n",
-			TEGRA_GPIO_GSENSOR_TOGGLE, toggle, toggle == 0 ? "sleep" : "wake-->normal");
-			bma150_set_mode( ctx, BMA150_MODE_SLEEP );
-			if( toggle == 1 ) {
-			bma150_set_mode( ctx, BMA150_MODE_NORMAL );
-			}
-			    }
-			counter = 0;
-				}
 	int comres;
 	unsigned char data[6];
 
@@ -1285,7 +1256,7 @@ static int bma150_read_accel_xyz(struct bma150ctx *ctx, bma150acc_t * acc)
 #ifdef xy_flip
 	temp1=(acc->x * -1);
 	acc->x=acc->y;
-	acc->y=temp1; 
+	acc->y=temp1;
 #endif
 	return 0;
 }
@@ -2244,31 +2215,68 @@ void bma150_input_close(struct input_dev *dev)
 	}
 }
 
-/* INPUT_ABS CONSTANTS */
-#define G_MAX			512
-#define FUZZ			32
-#define FLAT			32
+
+/* Scale 1 unit = 0.0078125m/s2 
+
+ 512 = 2G as measured by sensor = 9,80665 m/s2 * 2 = 19.6133m2
+ 
+*/
+
+/* Convert device to m/s2 * 1000 */
+#define DEV_to_MMS2(x) (((x) * 19613) >> 9)
+
+/* Convert m/s2 * 1000 to input subsystem units */
+#define MMS2_to_I(x) (((x) << 4) / 165)
+
+/* Convert device to input device */
+#define DEV_to_I(x) MMS2_to_I(DEV_to_MMS2(x))
+
+/* Maximum range for sensor: 2G */
+#define G_MAX MMS2_to_I(19613)
 
 static void bma150_report_values(struct bma150ctx *ctx, bma150acc_t* accel)
 {
-	input_report_abs(ctx->input, ABS_X, accel->x);
-	input_report_abs(ctx->input, ABS_Y, accel->y);
-	input_report_abs(ctx->input, ABS_Z, accel->z);
-	input_report_rel(ctx->input, REL_X, accel->x);
-	input_report_rel(ctx->input, REL_Y, accel->y);
-	input_report_rel(ctx->input, REL_Z, accel->z);
+	/* Reports axis in the way android expects them and in the right scale */ 
+	int x = -DEV_to_I(accel->x);
+	int y = -DEV_to_I(accel->y);
+	int z =  DEV_to_I(accel->z);
+	
+	input_report_abs(ctx->input, ABS_X, x);
+	input_report_abs(ctx->input, ABS_Y, y);
+	input_report_abs(ctx->input, ABS_Z, z);
+	input_report_rel(ctx->input, REL_X, x);
+	input_report_rel(ctx->input, REL_Y, y);
+	input_report_rel(ctx->input, REL_Z, z);
 
 	input_sync(ctx->input);
 }
 
+static int sqr(int x)
+{
+	return x * x;
+}
+
+static int bma150_dist2(bma150acc_t* a,bma150acc_t* b)
+{
+	return sqr(a->x - b->x) + sqr(a->y - b->y) + sqr(a->z - b->z);
+}
+
 static void bma150_input_work_func(struct work_struct *work)
 {
+	bma150acc_t rdacc;
 	struct bma150ctx *ctx = container_of((struct delayed_work *)work,
 					     struct bma150ctx, input_work);
 	mutex_lock(&ctx->lock);
 
-	if (bma150_read_accel_xyz(ctx, &ctx->acc) == 0) {
-		bma150_report_values(ctx, &ctx->acc);
+	// Read the accelerometer ...
+	if (bma150_read_accel_xyz(ctx, &rdacc) == 0) {
+		// Only report it if significant changes detected. This way, we wont saturate the caller
+		if (bma150_dist2(&rdacc,&ctx->acc) > 0) {
+			// a lot of difference... copy the new value
+			memcpy(&ctx->acc,&rdacc,sizeof(rdacc));
+			// and report the new value
+			bma150_report_values(ctx, &ctx->acc);
+		}
 	}
 	queue_delayed_work(ctx->input_work_queue, &ctx->input_work, msecs_to_jiffies(40));
 	mutex_unlock(&ctx->lock);
@@ -2302,9 +2310,9 @@ static int bma150_input_init(struct i2c_client *client)
 	set_bit(EV_ABS, ctx->input->evbit);
 	set_bit(ABS_MISC, ctx->input->absbit);
 
-	input_set_abs_params(ctx->input, ABS_X, -G_MAX, G_MAX, FUZZ, FLAT);
-	input_set_abs_params(ctx->input, ABS_Y, -G_MAX, G_MAX, FUZZ, FLAT);
-	input_set_abs_params(ctx->input, ABS_Z, -G_MAX, G_MAX, FUZZ, FLAT);
+	input_set_abs_params(ctx->input, ABS_X, -G_MAX, G_MAX, 1, 1);
+	input_set_abs_params(ctx->input, ABS_Y, -G_MAX, G_MAX, 1, 1);
+	input_set_abs_params(ctx->input, ABS_Z, -G_MAX, G_MAX, 1, 1);
 
 	input_set_capability(ctx->input, EV_REL, REL_X);
 	input_set_capability(ctx->input, EV_REL, REL_Y);

@@ -14,11 +14,15 @@
  *
  */ 
 
+#include <linux/kobject.h>
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/hrtimer.h>
 #include <linux/i2c.h>
 #include <asm/uaccess.h>
+#include <linux/sysfs.h>
+#include <linux/device.h>
+
 #include <linux/input.h>
 #include <linux/interrupt.h>
 #include <linux/earlysuspend.h>
@@ -41,6 +45,7 @@ struct ts_point {
 
 struct it7260_ts_data {
 	struct i2c_client *client;
+	struct kobject *kobj;
 	struct input_dev *input_dev;
 	char phys[32];
 	
@@ -66,15 +71,52 @@ static struct it7260_ts_data *gl_ts;
 
 // --- Low level touchscreen Functions
 #define COMMAND_BUFFER_INDEX 			0x20
-#define QUERY_BUFFER_INDEX 				0x80
+#define SYSTEM_BUFFER_INDEX				0x40
+
+#define QUERY_BUFFER_INDEX 			0x80
+#define 	QUERY_CMD_STATUS_SUCCESS 		0x00
+#define 	QUERY_CMD_STATUS_BUSY 			0x01
+#define 	QUERY_CMD_STATUS_ERROR 			0x02
+#define 	QUERY_CMD_STATUS_MASK			0x07
+
+#define 	QUERY_PTINFO_STATUS_POINT 		0x80
+#define 	QUERY_PTINFO_STATUS_FINGER_PEN 	0x08
+#define 	QUERY_PTINFO_STATUS_MASK		0xF1
+
+
+
 #define COMMAND_RESPONSE_BUFFER_INDEX 	0xA0
 #define POINT_BUFFER_INDEX2 			0xC0
 #define POINT_BUFFER_INDEX 				0xE0
 
-#define QUERY_SUCCESS 0x00
-#define QUERY_BUSY 0x01
-#define QUERY_ERROR 0x02
-#define QUERY_POINT 0x80
+
+/* Commands */ 
+#define CMD_ID_CAP_SENSOR		0x00 	/* Identify Cap Sensor */
+#define CMD_GET_CAP_SENSOR_INFO	0x01 	/* Inquiry Cap Sensor Information */
+#define CMD_SET_CAP_SENSOR_INFO	0x02 	/* Set Cap Sensor Information */
+#define CMD_RESV1				0x03	/* Reserved for internal use */
+#define CMD_SET_POWER_MODE		0x04 	/* Set Power Mode */
+#define CMD_GET_VAR_VALUE		0x05	/* Get Variable Value */
+#define CMD_SET_VAR_VALUE		0x06	/* Set Variable Value */
+#define CMD_RESV2				0x07	/* Reserved for internal use */
+#define CMD_ENTER_FW_UPGRADE	0x08
+#define CMD_EXIT_FW_UPGRADE		0x60 	/* Enter/Exit Firmware Upgrade Mode */
+#define CMD_SET_RW_OFFSET		0x09 	/* Set Start Offset of Flash for Read/Write */
+#define CMD_WRITE_FLASH			0x0A	/* Write Flash */
+#define CMD_READ_FLASH			0x0B 	/* Read Flash */
+#define CMD_REINIT_FW			0x0C	/* Reinitialize Firmware */
+#define CMD_WRITE_MEM			0x0D
+#define CMD_WRITE_REG			0xE0	/* Write Memory/Register */
+#define CMD_READ_MEM			0x0E
+#define CMD_READ_REG			0xE1	/* Read Memory/Register */
+#define CMD_RES3				0x0F
+#define CMD_RES4				0x10	/* Reserved for internal use */
+#define CMD_IDLE_SLEEP			0x11	/* Enable/Disable Idle/Sleep Mode */
+#define CMD_SET_IDLE_SLEEP_TIME	0x12 	/* Set Idle/Sleep Time Interval */
+#define CMD_CALIBRATE			0x13	/* Mass Production Calibration  */
+#define CMD_RES5				0x14	/* Reserved for internal use */
+#define CMD_SET_PT_THRESH		0x15	/* Set Point Threshold */
+
 
 static int it7260_read_query_buffer(struct it7260_ts_data *ts,unsigned char * pucData)
 {
@@ -184,23 +226,23 @@ static int it7260_write_command_buffer(struct it7260_ts_data *ts,unsigned char *
 // it7260_wait_for_idle: -1 on failure
 static int it7260_wait_for_idle(struct it7260_ts_data *ts)
 {
-	unsigned char ucQuery;
+	unsigned char ucQuery = 0;
 	int test_read_count=0;
 	
 	// If failed to read, let the controller end the processing...
 	if(it7260_read_query_buffer(ts,&ucQuery)<0)
 	{
 		msleep(10);
-		ucQuery = QUERY_BUSY;
+		ucQuery = QUERY_CMD_STATUS_BUSY;
 	}
 	
 	test_read_count=0;
-	while((ucQuery & QUERY_BUSY) && (test_read_count<50000) )
+	while((ucQuery & QUERY_CMD_STATUS_BUSY) && (test_read_count<50000) )
 	{
 		test_read_count++;
 		if(it7260_read_query_buffer(ts,&ucQuery)<0)
 		{
-			ucQuery = QUERY_BUSY;
+			ucQuery = QUERY_CMD_STATUS_BUSY;
 		}
 	}
 	if (test_read_count>=50000) {
@@ -227,18 +269,18 @@ static int it7260_flush(struct it7260_ts_data *ts)
 		ret = gpio_get_value(gpio) ? 0 : -1;
 	} else {
 		// No interrupt. Use a polling method
-		unsigned char ucQuery = QUERY_BUSY;
+		unsigned char ucQuery = QUERY_CMD_STATUS_BUSY;
 		unsigned char pucPoint[14];
 		int pollend = jiffies + HZ;	// 1 second of polling, maximum...
-		while( (ucQuery & QUERY_BUSY) && jiffies < pollend) {
+		while( (ucQuery & QUERY_CMD_STATUS_BUSY) && jiffies < pollend) {
 			if (it7260_read_query_buffer(ts,&ucQuery) >= 0) {
 				it7260_read_point_buffer(ts,pucPoint);
 			} else {
-				ucQuery = QUERY_BUSY;
+				ucQuery = QUERY_CMD_STATUS_BUSY;
 			}
 			schedule();
 		};
-		ret = (ucQuery & QUERY_BUSY) ? -1 : 0;
+		ret = (ucQuery & QUERY_CMD_STATUS_BUSY) ? -1 : 0;
 		
 	}
 	dev_info(&ts->client->dev,"flushing ended %s\n",(ret < 0) ? "timedout" : "ok");
@@ -249,7 +291,8 @@ static int it7260_flush(struct it7260_ts_data *ts)
 static int it7260_powerup(struct it7260_ts_data *ts)
 {
 	// Power on device
-	static unsigned char powerOnCmd[] = {0x04, 0x00, 0x00 };
+	static unsigned char powerOnCmd[] = {
+		CMD_SET_POWER_MODE, 0x00, 0x00 }; /* Full power mode */
 	
 	// Flush device first
 	it7260_flush(ts);
@@ -271,7 +314,8 @@ static int it7260_powerup(struct it7260_ts_data *ts)
 static int it7260_powerdown(struct it7260_ts_data *ts)
 {
 	// Power off device
-	static unsigned char powerOffCmd[] = {0x04, 0x00, 0x02 };
+	static unsigned char powerOffCmd[] = {
+		CMD_SET_POWER_MODE, 0x00, 0x02 }; /* Sleep power mode */
 	
 	if (it7260_wait_for_idle(ts)) {
 		dev_err(&ts->client->dev,"wait for idle on powerdown timed out\n");
@@ -289,7 +333,8 @@ static int it7260_powerdown(struct it7260_ts_data *ts)
 // Enable interrupts
 static int it7260_enable_interrupts(struct it7260_ts_data *ts)
 {
-	static unsigned char enableIntCmd[] = {0x02, 0x04, 0x01, 0x00 }; /* enable int, low level trigger */
+	static unsigned char enableIntCmd[] = {
+		CMD_SET_CAP_SENSOR_INFO, 0x04, 0x01, 0x00 }; /* enable int, low level trigger */
 	unsigned char ans[2] = {0,0};
 	
 	if (it7260_wait_for_idle(ts)) {
@@ -322,7 +367,8 @@ static int it7260_enable_interrupts(struct it7260_ts_data *ts)
 // Disable ints
 static int it7260_disable_interrupts(struct it7260_ts_data *ts)
 {
-	static unsigned char disableIntCmd[] = {0x02, 0x04, 0x00, 0x00 };
+	static unsigned char disableIntCmd[] = {
+		CMD_SET_CAP_SENSOR_INFO, 0x04, 0x00, 0x00 }; /* disable int, low level trigger */
 	unsigned char ans[2] = {0,0};
 	
 	if (it7260_wait_for_idle(ts)) {
@@ -356,11 +402,12 @@ static int it7260_disable_interrupts(struct it7260_ts_data *ts)
 static int it7260_calibrate_cap_sensor(struct it7260_ts_data *ts)
 {
 	unsigned char pucCalibrate[] = { 
-		0x13, 
-		0x01, 		 /* autotune */
-		0x01, 0x00,  /* threshold value = 0x0001 */
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-	unsigned char pucAns;
+		CMD_CALIBRATE, 
+		0x00,			/* subcommand 0 */
+		0x01, 			/* Enable autotune */
+		0x01, 0x00,  	/* threshold value = 0x0001 */
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	unsigned char ans[2] = {0,0};
 	int ret = 0;
 	
 	// Wait until idle
@@ -383,13 +430,13 @@ static int it7260_calibrate_cap_sensor(struct it7260_ts_data *ts)
 	}
 
 	// Read status
-	ret = it7260_read_command_response_buffer(ts,&pucAns,1);
-	return ret < 0 ? -1 : 0;
+	it7260_read_command_response_buffer(ts,&ans[0],2);
+	return ((ans[0] | ans[1]) != 0) ? -1 : 0;
 }
 
 static int it7260_init(struct it7260_ts_data *ts)
 {
-	unsigned char pucCmd[10];
+	unsigned char pucCmd[15];
 	int ret = 0,i;
 	
 	// Reinitialize Firmware
@@ -398,7 +445,7 @@ static int it7260_init(struct it7260_ts_data *ts)
 		return -1;
 	}
 		
-	pucCmd[0] = 0x6F;
+	pucCmd[0] = CMD_REINIT_FW;
 	ret = it7260_write_command_buffer(ts,pucCmd,1);
 	if (ret < 0) {
 		dev_err(&ts->client->dev,"failed to reset touchpad\n");
@@ -437,7 +484,7 @@ static int it7260_init(struct it7260_ts_data *ts)
 	//  So, just ignore failures here
 			
 	// Identify
-    pucCmd[0] = 0x00; 
+    pucCmd[0] = CMD_ID_CAP_SENSOR; 
 	ret = it7260_write_command_buffer(ts,pucCmd,1);
 	if (ret < 0) {
 		dev_err(&ts->client->dev,"unable to send identify command\n");
@@ -475,7 +522,7 @@ static int it7260_init(struct it7260_ts_data *ts)
 		dev_err(&ts->client->dev,"wait for idle on firmware version timed out\n");
 	}
 		
-	pucCmd[0] = 0x01;
+	pucCmd[0] = CMD_GET_CAP_SENSOR_INFO;
 	pucCmd[1] = 0x00;
 	ret = it7260_write_command_buffer(ts,pucCmd,2);
 	if (ret < 0) {
@@ -509,7 +556,7 @@ static int it7260_init(struct it7260_ts_data *ts)
 		dev_err(&ts->client->dev,"wait for idle while getting 2D resolutions\n");
 	}
 		
-	pucCmd[0] = 0x01;
+	pucCmd[0] = CMD_GET_CAP_SENSOR_INFO;
 	pucCmd[1] = 0x02;
 	pucCmd[2] = 0x00;
 	ret = it7260_write_command_buffer(ts,pucCmd,3);
@@ -522,7 +569,7 @@ static int it7260_init(struct it7260_ts_data *ts)
 	}
 		
 	memset(&pucCmd, 0, sizeof(pucCmd));
-	ret = it7260_read_command_response_buffer(ts,pucCmd,7);
+	ret = it7260_read_command_response_buffer(ts,pucCmd,11);
 	if (ret < 0) {
 		dev_err(&ts->client->dev,"unable to read 2D resolution\n");
 	}
@@ -915,8 +962,8 @@ static void it7260_readpoints(struct it7260_ts_data *ts)
 		return;
 	}
 	
-	// If no query point
-	if(!(ucQuery & QUERY_POINT))
+	// If point information available...
+	if(!(ucQuery & QUERY_PTINFO_STATUS_POINT))
 	{
 		if (ts->use_irq)
 		   enable_irq(ts->client->irq);
@@ -962,19 +1009,6 @@ static void it7260_readpoints(struct it7260_ts_data *ts)
 		   enable_irq(ts->client->irq);
 		return ;
 	}
-	
-	// no more data
-	if(!(pucPoint[0] & 0x08))
-	{
-		input_report_key(ts->input_dev, BTN_TOUCH, 0);
-		input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
-		input_mt_sync(ts->input_dev);
-		input_sync(ts->input_dev);
-		if (ts->use_irq)
-			enable_irq(ts->client->irq);
-		it7260_read_query_buffer(ts,&ucQuery);
-		return;
-	}
 #endif
 
 	// Collect all finger data
@@ -990,7 +1024,7 @@ static void it7260_readpoints(struct it7260_ts_data *ts)
 	{
 		p[idx].x = ((pucPoint[7] & 0x0F) << 8) + pucPoint[6];
 		p[idx].y = ((pucPoint[7] & 0xF0) << 4) + pucPoint[8];
-		p[idx].p = pucPoint[9]&0x0f;
+		p[idx].p = pucPoint[9] & 0x0f;
 		idx++;
 	}
 	
@@ -998,7 +1032,7 @@ static void it7260_readpoints(struct it7260_ts_data *ts)
 	{
 		p[idx].x = ((pucPoint[11] & 0x0F) << 8) + pucPoint[10];
 		p[idx].y = ((pucPoint[11] & 0xF0) << 4) + pucPoint[12];
-		p[idx].p = pucPoint[13]&0x0f;
+		p[idx].p = pucPoint[13] & 0x0f;
 		idx++;
 	}
 
@@ -1123,15 +1157,22 @@ static DEVICE_ATTR(threshold, 0664, threshold_show, threshold_store);
 static ssize_t it7260_calibration_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "[%d][%d]\n", 0,0);
+	return sprintf(buf, "0\n");
 }
 
 static ssize_t it7260_calibration_store(struct device *dev,
 				    struct device_attribute *attr,
 				    const char *buf, size_t count)
 {
+	if (gl_ts->use_irq) 
+		disable_irq(gl_ts->client->irq);
+
 	it7260_calibrate_cap_sensor(gl_ts);
-	return 0;
+	
+	if (gl_ts->use_irq) 
+		enable_irq(gl_ts->client->irq);
+
+	return count;
 }
 static DEVICE_ATTR(calibration, 0666, it7260_calibration_show, it7260_calibration_store);
 
@@ -1139,6 +1180,48 @@ static DEVICE_ATTR(calibration, 0666, it7260_calibration_show, it7260_calibratio
 static void it7260_ts_early_suspend(struct early_suspend *h);
 static void it7260_ts_late_resume(struct early_suspend *h);
 #endif
+
+
+static ssize_t it7260_read(struct device *dev, struct device_attribute *attr,
+		       char *buf)
+{
+	return strlcpy(buf, "0\n", 3);
+}
+
+static ssize_t it7260_write(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	unsigned long on = simple_strtoul(buf, NULL, 10);
+
+	if (!strcmp(attr->attr.name, "calibrate")) {
+		if (on) {
+		
+			if (gl_ts->use_irq) 
+				disable_irq(gl_ts->client->irq);
+		
+			it7260_calibrate_cap_sensor(gl_ts);
+			
+			if (gl_ts->use_irq) 
+				enable_irq(gl_ts->client->irq);
+			
+		}
+	} 
+
+	return count;
+}
+
+static DEVICE_ATTR(calibrate, 0666, it7260_read, it7260_write); /* Allow everybody to recalibrate */
+
+static struct attribute *it7260_sysfs_entries[] = {
+	&dev_attr_calibrate.attr,
+	NULL
+};
+
+static struct attribute_group it7260_attr_group = {
+	.name	= NULL,
+	.attrs	= it7260_sysfs_entries,
+}; 
+
 
 ///////////////////////////////////////////////////////////////////////////////////////
 static int it7260_ts_probe(
@@ -1284,6 +1367,17 @@ static int it7260_ts_probe(
 		goto err_attr_create;
 	}
 
+	/* Register a sysfs interface to let user switch modes */
+	ts->kobj = kobject_create_and_add("touchscreen", NULL);
+	if (!ts->kobj) {
+		pr_err("Unable to register touchscreen calibration sysfs entry");
+	} else {
+		/* Attach an attribute to the already registered touchscreen entry to let the user force recalibration */
+		if (sysfs_create_group(ts->kobj, &it7260_attr_group)) {
+			pr_err("Unable to create sysfs touchscreen calibration group");
+		}
+	}
+	
 	dev_info(&client->dev,"touchscreen driver loaded (using ints:%c)\n",ts->use_irq?'Y':'N');
 	return 0;
 	
@@ -1316,6 +1410,12 @@ error_not_found:
 static int it7260_ts_remove(struct i2c_client *client)
 {
 	struct it7260_ts_data *ts = i2c_get_clientdata(client);
+	
+	if (ts->kobj) {
+		sysfs_remove_group(ts->kobj, &it7260_attr_group); 
+		kobject_put(ts->kobj);
+		ts->kobj = NULL;
+	}
 	
 	it7260_disable_interrupts(ts);
 	if (ts->use_irq)

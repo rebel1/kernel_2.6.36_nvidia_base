@@ -60,6 +60,8 @@
 	Codec is ALC5624
 	Codec I2C Address = 0x30(includes R/W bit), i2c #0
 	Codec MCLK = APxx DAP_MCLK1
+	
+	Bluetooth is always master
 */
 
 #if LINUX_VERSION_CODE == KERNEL_VERSION(2,6,36)
@@ -226,7 +228,7 @@ static struct tegra_audio_platform_data tegra_audio_pdata[] = {
 	},
 	/* For I2S2 - Bluetooth */
 	[1] = {
-		.i2s_master		= true,
+		.i2s_master		= false,	/* bluetooth is master always */
 		.dma_on			= true,  /* use dma by default */
 		.i2s_master_clk = 8000,
 		.dsp_master_clk = 8000,
@@ -254,8 +256,8 @@ static struct alc5624_platform_data alc5624_pdata = {
 	
 	.mic1bias_mv		= 2970,	/* MIC1 bias voltage */
 	.mic2bias_mv		= 2970,	/* MIC2 bias voltage */
-	.mic1boost_db		= 40,	/* MIC1 gain boost */
-	.mic2boost_db		= 40,	/* MIC2 gain boost */
+	.mic1boost_db		= 30,	/* MIC1 gain boost */
+	.mic2boost_db		= 30,	/* MIC2 gain boost */
 	
 	.default_is_mic2 	= true,	/* Shuttle uses MIC2 as the default capture source */
 	

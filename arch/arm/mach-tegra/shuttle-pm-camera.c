@@ -122,10 +122,10 @@ static ssize_t camera_write(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static DEVICE_ATTR(power_on, 0644, camera_read, camera_write);
-static DEVICE_ATTR(reset, 0644, camera_read, camera_write);
+static DEVICE_ATTR(power_on, 0666, camera_read, camera_write);
+static DEVICE_ATTR(reset, 0666, camera_read, camera_write);
 #ifdef CONFIG_PM
-static DEVICE_ATTR(keep_on_in_suspend, 0644, camera_read, camera_write);
+static DEVICE_ATTR(keep_on_in_suspend, 0666, camera_read, camera_write);
 #endif
 
 #ifdef CONFIG_PM

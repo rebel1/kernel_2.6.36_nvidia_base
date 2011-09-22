@@ -316,7 +316,7 @@ static int __init get_cfg_from_tags(void)
 		tegra_bootloader_fb_start = NvBootArgs.MemHandleArgs[NvBootArgs.FramebufferArgs.MemHandleKey - ATAG_NVIDIA_PRESERVED_MEM_0].Address;
 		tegra_bootloader_fb_size  = NvBootArgs.MemHandleArgs[NvBootArgs.FramebufferArgs.MemHandleKey - ATAG_NVIDIA_PRESERVED_MEM_0].Size;
 		
-		pr_info("Nvidia TAG: framebuffer: %u @ 0x%08lx\n",tegra_bootloader_fb_size,tegra_bootloader_fb_start);
+		pr_info("Nvidia TAG: framebuffer: %lu @ 0x%08lx\n",tegra_bootloader_fb_size,tegra_bootloader_fb_start);
 		
 		/* Unfortunately, the kernel locks up if we enable this */
 		tegra_bootloader_fb_start = tegra_bootloader_fb_size = 0;
@@ -332,7 +332,7 @@ static int __init get_cfg_from_tags(void)
 		tegra_lp0_vec_start = NvBootArgs.MemHandleArgs[NvBootArgs.WarmbootArgs.MemHandleKey - ATAG_NVIDIA_PRESERVED_MEM_0].Address;
 		tegra_lp0_vec_size  = NvBootArgs.MemHandleArgs[NvBootArgs.WarmbootArgs.MemHandleKey - ATAG_NVIDIA_PRESERVED_MEM_0].Size;
 
-		pr_info("Nvidia TAG: LP0: %u @ 0x%08lx\n",tegra_lp0_vec_size,tegra_lp0_vec_start);		
+		pr_info("Nvidia TAG: LP0: %lu @ 0x%08lx\n",tegra_lp0_vec_size,tegra_lp0_vec_start);		
 		
 		/* Until we find out if the bootloader supports the workaround required to implement
 		   LP0, disable it */
@@ -501,10 +501,20 @@ void dump_bootflags(void)
 
 
 static atomic_t shuttle_3g_gps_powered = ATOMIC_INIT(0);
+static struct {
+	struct regulator *regulator[2];
+} gps_gsm_ctx = {
+	{NULL,NULL}
+};
+
 void shuttle_3g_gps_poweron(void)
 {
 	if (atomic_inc_return(&shuttle_3g_gps_powered) == 1) {
 		pr_info("Enabling 3G/GPS module\n");
+		
+		regulator_enable(gps_gsm_ctx.regulator[0]);
+		regulator_enable(gps_gsm_ctx.regulator[1]);
+		
 		/* 3G/GPS power on sequence */
 		gpio_set_value(SHUTTLE_3GGPS_DISABLE, 0); /* Enable power */
 		msleep(2);
@@ -516,28 +526,197 @@ void shuttle_3g_gps_poweroff(void)
 {
 	if (atomic_dec_return(&shuttle_3g_gps_powered) == 0) {
 		pr_info("Disabling 3G/GPS module\n");
+		
+		
 		/* 3G/GPS power on sequence */
 		gpio_set_value(SHUTTLE_3GGPS_DISABLE, 1); /* Disable power */
 		msleep(2);
+		
+		regulator_disable(gps_gsm_ctx.regulator[1]);
+		regulator_disable(gps_gsm_ctx.regulator[0]);
+		
 	}
 }
 EXPORT_SYMBOL_GPL(shuttle_3g_gps_poweroff);
 
 static atomic_t shuttle_3g_gps_inited = ATOMIC_INIT(0);
-void shuttle_3g_gps_init(void)
+int shuttle_3g_gps_init(void)
 {
 	if (atomic_inc_return(&shuttle_3g_gps_inited) == 1) {
 		gpio_request(SHUTTLE_3GGPS_DISABLE, "gps_disable");
 		gpio_direction_output(SHUTTLE_3GGPS_DISABLE, 1);
+		
+		gps_gsm_ctx.regulator[0] = regulator_get(NULL, "avdd_usb_pll");
+		if (IS_ERR(gps_gsm_ctx.regulator[0])) {
+			pr_err("unable to get regulator for usb pll\n");
+			atomic_dec(&shuttle_3g_gps_inited);
+			return -ENODEV;
+		}
+
+		gps_gsm_ctx.regulator[1] = regulator_get(NULL, "avdd_usb");
+		if (IS_ERR(gps_gsm_ctx.regulator[1])) {
+			pr_err("unable to get regulator for usb\n");
+			regulator_put(gps_gsm_ctx.regulator[0]);
+			atomic_dec(&shuttle_3g_gps_inited);
+			return -ENODEV;
+		}
 	}
+	return 0;
 }
 EXPORT_SYMBOL_GPL(shuttle_3g_gps_init);
 
 void shuttle_3g_gps_deinit(void)
 {
-	atomic_dec(&shuttle_3g_gps_inited);
+	if (atomic_dec_return(&shuttle_3g_gps_inited) == 0) {
+		regulator_put(gps_gsm_ctx.regulator[1]);
+		regulator_put(gps_gsm_ctx.regulator[0]);
+		memset(&gps_gsm_ctx,0,sizeof(gps_gsm_ctx));
+	}
 }
 EXPORT_SYMBOL_GPL(shuttle_3g_gps_deinit);
+
+////////
+
+static atomic_t shuttle_wlan_bt_powered = ATOMIC_INIT(0);
+static struct {
+	struct clk *	  clk;
+	struct regulator *regulator[3];
+} wlan_bt_ctx = {
+	NULL, {NULL,NULL,NULL}
+};
+
+void shuttle_wlan_bt_poweron(void)
+{
+	if (atomic_inc_return(&shuttle_wlan_bt_powered) == 1) {
+		pr_info("Enabling WLAN/BT module\n");
+
+		/* Wlan power on sequence - Taken from the AR6002 datasheet */
+		gpio_set_value(SHUTTLE_WLAN_POWER, 0); /* Powerdown */
+		gpio_set_value(SHUTTLE_WLAN_RESET, 0); /* Assert reset */
+		gpio_set_value(SHUTTLE_BT_RESET, 0); /* Assert reset */
+		
+		msleep(1);
+
+		/* Turn on voltages properly sequencing them */
+		regulator_enable(wlan_bt_ctx.regulator[0]); /* 1.8v */
+		regulator_enable(wlan_bt_ctx.regulator[1]); /* 1.2v */
+		regulator_enable(wlan_bt_ctx.regulator[2]);
+		clk_enable(wlan_bt_ctx.clk);
+		msleep(1);
+		
+		gpio_set_value(SHUTTLE_WLAN_RESET, 1); /* Deassert Sys reset */
+		msleep(5);
+		
+		gpio_set_value(SHUTTLE_WLAN_POWER, 1); /* Take out the Wlan adapter from powerdown */
+		msleep(5);
+
+		/* just in case, reset the adapter again */
+		gpio_set_value(SHUTTLE_WLAN_RESET, 0); /* Assert Sys reset */
+		msleep(5);
+		gpio_set_value(SHUTTLE_WLAN_RESET, 1); /* Deassert Sys reset */
+		msleep(5); /* Leave some time for stabilization */
+	
+	
+		/* Bluetooth power on sequence */
+		msleep(200);
+		gpio_set_value(SHUTTLE_BT_RESET, 1); /* Deassert reset */
+		msleep(2);
+		
+	}
+}
+EXPORT_SYMBOL_GPL(shuttle_wlan_bt_poweron);
+
+void shuttle_wlan_bt_poweroff(void)
+{
+	if (atomic_dec_return(&shuttle_wlan_bt_powered) == 0) {
+		pr_info("Disabling WLAN/BT module\n");
+		
+		gpio_set_value(SHUTTLE_BT_RESET, 0); /* Assert reset */
+		
+		gpio_set_value(SHUTTLE_WLAN_POWER, 0); /* Powerdown wlan adapter */
+		msleep(1);
+		
+		gpio_set_value(SHUTTLE_WLAN_RESET, 0); /* Assert reset */
+		msleep(1);
+
+		clk_disable(wlan_bt_ctx.clk);
+		regulator_disable(wlan_bt_ctx.regulator[2]);
+		regulator_disable(wlan_bt_ctx.regulator[1]);
+		regulator_disable(wlan_bt_ctx.regulator[0]);
+		msleep(1);
+	}
+}
+EXPORT_SYMBOL_GPL(shuttle_wlan_bt_poweroff);
+
+static atomic_t shuttle_wlan_bt_inited = ATOMIC_INIT(0);
+int shuttle_wlan_bt_init(void)
+{
+	if (atomic_inc_return(&shuttle_wlan_bt_inited) == 1) {
+	
+		wlan_bt_ctx.regulator[0] = regulator_get(NULL, "vddio_wlan"); /* 1.8v */
+		if (IS_ERR(wlan_bt_ctx.regulator[0])) {
+			pr_err("unable to get regulator 0 (1.8v)\n");
+			atomic_dec(&shuttle_wlan_bt_inited);
+			return -ENODEV;
+		}
+
+		wlan_bt_ctx.regulator[1] = regulator_get(NULL, "vcore_wifi"); /* 1.2v */
+		if (IS_ERR(wlan_bt_ctx.regulator[1])) {
+			pr_err("unable to get regulator 1 (1.2v)\n");
+			regulator_put(wlan_bt_ctx.regulator[0]);
+			atomic_dec(&shuttle_wlan_bt_inited);
+			return -ENODEV;
+		}
+	
+		/* Init io pins */
+		gpio_request(SHUTTLE_WLAN_POWER, "wlan_power");
+		gpio_direction_output(SHUTTLE_WLAN_POWER, 0);
+
+		gpio_request(SHUTTLE_WLAN_RESET, "wlan_reset");
+		gpio_direction_output(SHUTTLE_WLAN_RESET, 0);
+
+		wlan_bt_ctx.regulator[2] = regulator_get(NULL, "vddhostif_bt");
+		if (IS_ERR(wlan_bt_ctx.regulator[2])) {
+			pr_err("Failed to get regulator\n");
+			regulator_put(wlan_bt_ctx.regulator[1]);
+			regulator_put(wlan_bt_ctx.regulator[0]);
+			atomic_dec(&shuttle_wlan_bt_inited);
+			return -ENODEV;
+		}
+	
+		wlan_bt_ctx.clk = clk_get(NULL, "blink");
+		if (IS_ERR(wlan_bt_ctx.clk)) {
+			pr_err("Failed to get clock\n");
+			regulator_put(wlan_bt_ctx.regulator[2]);
+			regulator_put(wlan_bt_ctx.regulator[1]);
+			regulator_put(wlan_bt_ctx.regulator[0]);
+			atomic_dec(&shuttle_wlan_bt_inited);
+			return -ENODEV;
+		}
+
+		/* Init io pins */
+		gpio_request(SHUTTLE_BT_RESET, "bluetooth_reset");
+		gpio_direction_output(SHUTTLE_BT_RESET, 0);
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(shuttle_wlan_bt_init);
+
+void shuttle_wlan_bt_deinit(void)
+{
+	if (atomic_dec_return(&shuttle_wlan_bt_inited) == 0) {
+	
+		regulator_put(wlan_bt_ctx.regulator[2]);
+		clk_put(wlan_bt_ctx.clk);
+		
+		regulator_put(wlan_bt_ctx.regulator[1]);	
+		regulator_put(wlan_bt_ctx.regulator[0]);
+		
+		memset(&wlan_bt_ctx,0,sizeof(wlan_bt_ctx));
+	}
+	
+}
+EXPORT_SYMBOL_GPL(shuttle_wlan_bt_deinit);
 
 static struct tegra_suspend_platform_data shuttle_suspend = {
 	.cpu_timer 	  	= 2000,  	// 5000

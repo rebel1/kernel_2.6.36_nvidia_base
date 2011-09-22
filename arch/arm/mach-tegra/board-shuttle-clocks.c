@@ -263,11 +263,11 @@ static __initdata struct tegra_clk_init_table shuttle_clk_init_table[] = {
 	{ "tvo",		"clk_m",		 12000000,	false},			
 	{ "tvdac",		"clk_m",		 12000000,	false},			
 
-	{ "usbd",		"clk_m",		 12000000,	false},		/* fsl-tegra-udc , utmip-pad , tegra_ehci.0 , tegra_otg */
-	{ "usb2",		"clk_m",		 12000000,	false},		/* tegra_ehci.1 */
-	{ "usb3",		"clk_m",		 12000000,	false},		/* tegra_ehci.2 */
+	{ "usbd",		"clk_m",		 12000000,	true},		/* fsl-tegra-udc , utmip-pad , tegra_ehci.0 , tegra_otg - we need this to be always on to always get hotplug events */
+	{ "usb2",		"clk_m",		 12000000,	false},		/* tegra_ehci.1 - Really unused*/
+	{ "usb3",		"clk_m",		 12000000,	true},		/* tegra_ehci.2 - we need this to be always on to always get hotplug events */
 	
-	{ "pwm",    	"clk_m",   		 12000000,  false},		/* tegra-pwm.0 tegra-pwm.1 tegra-pwm.2 tegra-pwm.3*/
+	{ "pwm",    		"clk_m",   		 12000000,	false},		/* tegra-pwm.0 tegra-pwm.1 tegra-pwm.2 tegra-pwm.3*/
 	
 	{ "kbc",		"clk_32k",			32768,	false},		/* tegra-kbc */
 	{ "blink",		"clk_32k",			32768,	false},		/* used for bluetooth */

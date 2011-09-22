@@ -17,16 +17,13 @@
 #include <linux/gpio.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
-#include <linux/regulator/consumer.h>
 #include <linux/err.h>
 #include <linux/slab.h>
-#include <linux/regulator/consumer.h>
 #include "board-shuttle.h"
 #include "gpio-names.h"
 
 
 struct shuttle_pm_gps_data {
-	struct regulator *regulator[2];
 #ifdef CONFIG_PM
 	int pre_resume_state;
 	int keep_on_in_suspend;
@@ -44,9 +41,6 @@ static void __shuttle_pm_gps_toggle_radio(struct device *dev, unsigned int on)
 		return;
 	
 	if (on) {
-
-		regulator_enable(gps_data->regulator[0]);
-		regulator_enable(gps_data->regulator[1]);
 	
 		/* 3G/GPS power on sequence */
 		shuttle_3g_gps_poweron();
@@ -55,8 +49,6 @@ static void __shuttle_pm_gps_toggle_radio(struct device *dev, unsigned int on)
 	
 		shuttle_3g_gps_poweroff();
 				
-		regulator_disable(gps_data->regulator[1]);
-		regulator_disable(gps_data->regulator[0]);
 	}
 	
 	/* store new state */
@@ -103,10 +95,10 @@ static ssize_t shuttle_gps_write(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(power_on, 0644, shuttle_gps_read, shuttle_gps_write);
-static DEVICE_ATTR(pwron, 0644, shuttle_gps_read, shuttle_gps_write);
+static DEVICE_ATTR(power_on, 0666, shuttle_gps_read, shuttle_gps_write);
+static DEVICE_ATTR(pwron, 0666, shuttle_gps_read, shuttle_gps_write);
 #ifdef CONFIG_PM
-static DEVICE_ATTR(keep_on_in_suspend, 0644, shuttle_gps_read, shuttle_gps_write);
+static DEVICE_ATTR(keep_on_in_suspend, 0666, shuttle_gps_read, shuttle_gps_write);
 #endif
 
 
@@ -155,8 +147,8 @@ static int __init shuttle_pm_gps_probe(struct platform_device *pdev)
 {
 	/* start with gps enabled */
 	int default_state = 1;
+	int ret;
 	
-	struct regulator *regulator[2];
 	struct shuttle_pm_gps_data *gps_data;
 	
 	gps_data = kzalloc(sizeof(*gps_data), GFP_KERNEL);
@@ -166,28 +158,13 @@ static int __init shuttle_pm_gps_probe(struct platform_device *pdev)
 	}
 	dev_set_drvdata(&pdev->dev, gps_data);
 
-	regulator[0] = regulator_get(&pdev->dev, "avdd_usb_pll");
-	if (IS_ERR(regulator[0])) {
-		dev_err(&pdev->dev, "unable to get regulator for usb pll\n");
+	ret = shuttle_3g_gps_init();
+	if (ret) {
+		dev_err(&pdev->dev, "unable to init gps/gsm module\n");
 		kfree(gps_data);
 		dev_set_drvdata(&pdev->dev, NULL);
-		return -ENODEV;
+		return ret;
 	}
-	gps_data->regulator[0] = regulator[0];
-
-	regulator[1] = regulator_get(&pdev->dev, "avdd_usb");
-	if (IS_ERR(regulator[1])) {
-		dev_err(&pdev->dev, "unable to get regulator for usb\n");
-		regulator_put(regulator[0]);
-		kfree(gps_data);
-		dev_set_drvdata(&pdev->dev, NULL);
-		return -ENODEV;
-	}
-
-	gps_data->regulator[1] = regulator[1];
-	
-	/* Init io pins */
-	shuttle_3g_gps_init();
 
 	/* Set the default state */
 	__shuttle_pm_gps_toggle_radio(&pdev->dev, default_state);
@@ -208,8 +185,7 @@ static int shuttle_pm_gps_remove(struct platform_device *pdev)
 	
 	__shuttle_pm_gps_toggle_radio(&pdev->dev, 0);
 
-	regulator_put(gps_data->regulator[0]);
-	regulator_put(gps_data->regulator[1]);
+	shuttle_3g_gps_deinit();
 
 	kfree(gps_data);
 	dev_set_drvdata(&pdev->dev, NULL);

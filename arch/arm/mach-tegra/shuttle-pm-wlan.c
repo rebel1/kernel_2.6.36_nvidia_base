@@ -42,7 +42,6 @@
 #include "gpio-names.h"
 
 struct shuttle_pm_wlan_data {
-	struct regulator *regulator[2];
 	struct rfkill *rfkill;
 #ifdef CONFIG_PM
 	int pre_resume_state;
@@ -63,44 +62,14 @@ static void __shuttle_pm_wlan_toggle_radio(struct device *dev, unsigned int on)
 	
 	if (on) {
 
-		/* Wlan power on sequence - Taken from the AR6002 datasheet */
-		gpio_set_value(SHUTTLE_WLAN_POWER, 0); /* Powerdown */
-		gpio_set_value(SHUTTLE_WLAN_RESET, 0); /* Assert reset */
-		msleep(1);
-		
-		/* Turn on voltages properly sequencing them */
-		regulator_enable(wlan_data->regulator[0]); /* 1.8v */
-		msleep(1);
-		regulator_enable(wlan_data->regulator[1]); /* 1.2v */
-		msleep(1);
-		
-		gpio_set_value(SHUTTLE_WLAN_RESET, 1); /* Deassert Sys reset */
-		msleep(5);
-		
-		gpio_set_value(SHUTTLE_WLAN_POWER, 1); /* Take out the Wlan adapter from powerdown */
-		msleep(5);
-
-		/* just in case, reset the adapter again */
-		gpio_set_value(SHUTTLE_WLAN_RESET, 0); /* Assert Sys reset */
-		msleep(5);
-		gpio_set_value(SHUTTLE_WLAN_RESET, 1); /* Deassert Sys reset */
-		msleep(5); /* Leave some time for stabilization */
-
+		shuttle_wlan_bt_poweron();
 		dev_info(dev, "WLAN adapter enabled\n");
 		
 	} else {
+	
+		shuttle_wlan_bt_poweroff();
 		dev_info(dev, "WLAN adapter disabled\n");
 		
-		gpio_set_value(SHUTTLE_WLAN_POWER, 0); /* Powerdown wlan adapter */
-		msleep(1);
-		
-		gpio_set_value(SHUTTLE_WLAN_RESET, 0); /* Assert reset */
-		msleep(1);
-		
-		regulator_disable(wlan_data->regulator[1]);
-		msleep(1);
-		regulator_disable(wlan_data->regulator[0]);
-		msleep(1);
 	}
 	
 	/* store new state */
@@ -195,10 +164,10 @@ static ssize_t wlan_write(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static DEVICE_ATTR(power_on, 0644, wlan_read, wlan_write);
-static DEVICE_ATTR(reset, 0644, wlan_read, wlan_write);
+static DEVICE_ATTR(power_on, 0666, wlan_read, wlan_write);
+static DEVICE_ATTR(reset, 0666, wlan_read, wlan_write);
 #ifdef CONFIG_PM
-static DEVICE_ATTR(keep_on_in_suspend, 0644, wlan_read, wlan_write);
+static DEVICE_ATTR(keep_on_in_suspend, 0666, wlan_read, wlan_write);
 #endif
 
 #ifdef CONFIG_PM
@@ -253,7 +222,6 @@ static int __init shuttle_wlan_probe(struct platform_device *pdev)
 	const int default_blocked_state = 0;
 	
 	struct rfkill *rfkill;
-	struct regulator *regulator[2];
 	struct shuttle_pm_wlan_data *wlan_data;
 	int ret;
 
@@ -264,41 +232,21 @@ static int __init shuttle_wlan_probe(struct platform_device *pdev)
 	}
 	dev_set_drvdata(&pdev->dev, wlan_data);
 
-	regulator[0] = regulator_get(&pdev->dev, "vddio_wlan"); /* 1.8v */
-	if (IS_ERR(regulator[0])) {
-		dev_err(&pdev->dev, "unable to get regulator 0 (1.8v)\n");
+	ret = shuttle_wlan_bt_init();
+	if (ret) {
+		dev_err(&pdev->dev, "unable to init wlan/bt module\n");
 		kfree(wlan_data);
 		dev_set_drvdata(&pdev->dev, NULL);
-		return -ENODEV;
+		return ret;
 	}
 
-	wlan_data->regulator[0] = regulator[0];
-
-	regulator[1] = regulator_get(&pdev->dev, "vcore_wifi"); /* 1.2v */
-	if (IS_ERR(regulator[1])) {
-		dev_err(&pdev->dev, "unable to get regulator 1 (1.2v)\n");
-		regulator_put(regulator[0]);
-		kfree(wlan_data);
-		dev_set_drvdata(&pdev->dev, NULL);
-		return -ENODEV;
-	}
-	wlan_data->regulator[1] = regulator[1];
-	
-	/* Init io pins */
-	gpio_request(SHUTTLE_WLAN_POWER, "wlan_power");
-	gpio_direction_output(SHUTTLE_WLAN_POWER, 0);
-
-	gpio_request(SHUTTLE_WLAN_RESET, "wlan_reset");
-	gpio_direction_output(SHUTTLE_WLAN_RESET, 0);
-	
 	rfkill = rfkill_alloc(pdev->name, &pdev->dev, RFKILL_TYPE_WLAN,
 							&shuttle_wlan_rfkill_ops, &pdev->dev);
 
 
 	if (!rfkill) {
 		dev_err(&pdev->dev, "Failed to allocate rfkill\n");
-		regulator_put(regulator[1]);
-		regulator_put(regulator[0]);
+		shuttle_wlan_bt_deinit();
 		kfree(wlan_data);
 		dev_set_drvdata(&pdev->dev, NULL);
 		return -ENOMEM;
@@ -317,8 +265,7 @@ static int __init shuttle_wlan_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to register rfkill\n");
 		rfkill_destroy(rfkill);		
-		regulator_put(regulator[1]);
-		regulator_put(regulator[0]);
+		shuttle_wlan_bt_deinit();
 		kfree(wlan_data);
 		dev_set_drvdata(&pdev->dev, NULL);
 		return ret;
@@ -342,8 +289,7 @@ static int shuttle_wlan_remove(struct platform_device *pdev)
 
 	shuttle_wlan_set_carddetect(&pdev->dev, 0);
 	
-	regulator_put(wlan_data->regulator[0]);	
-	regulator_put(wlan_data->regulator[1]);
+	shuttle_wlan_bt_deinit();
 
 	kfree(wlan_data);
 	dev_set_drvdata(&pdev->dev, NULL);
