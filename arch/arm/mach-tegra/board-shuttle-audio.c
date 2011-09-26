@@ -252,7 +252,7 @@ static struct alc5624_platform_data alc5624_pdata = {
 	.avdd_mv			= 3300,	/* Analog vdd in millivolts */
 	.spkvdd_mv 			= 5000,	/* Speaker Vdd in millivolts */
 	.hpvdd_mv 			= 3300,	/* Headphone Vdd in millivolts */
-	.spkvol_scale 		= 80,	/* Scale speaker volume to the percent of maximum range -Be careful: range is logarithmic! */
+	.spkvol_scale 		= 88,	/* Scale speaker volume to the percent of maximum range -Be careful: range is logarithmic! */
 	
 	.mic1bias_mv		= 2970,	/* MIC1 bias voltage */
 	.mic2bias_mv		= 2970,	/* MIC2 bias voltage */

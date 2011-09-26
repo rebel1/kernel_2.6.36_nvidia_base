@@ -577,12 +577,12 @@ static const struct {
 	{ALC5624_PHONEIN_MONO_OUT_VOL		, 0xDFDF }, /* Phone input muted, Mono output muted */
 	{ALC5624_LINE_IN_VOL				, 0xFF1F }, /* Mute Line In volume */
 	{ALC5624_STEREO_DAC_VOL				, 0x6808 }, /* Mute volume output to Mono and Speaker */
-	{ALC5624_MIC_VOL					, 0x0808 }, /* Mic volume = 0db */
+	{ALC5624_MIC_VOL					, 0x0000 }, /* Mic volume = +12db gain */
 	{ALC5624_MIC_ROUTING_CTRL			, 0xF0F0 }, /* Mute mic volume to Headphone, Speaker and Mono mixers, Differential mode enabled */
 	{ALC5624_ADC_REC_GAIN				, 0xF58B },
 	{ALC5624_ADC_REC_MIXER				, 0x3F3F }, /* Mic1 as recording sources - will be overriden on init */
 	{ALC5624_OUTPUT_MIXER_CTRL			, 0x6B00 }, /* SPKL from HP mixer, Class D amplifier, SPKR from HP mixer, HPL from headphone mixer, HPR from headphone mixer, Mono from VMid */
-	{ALC5624_MIC_CTRL					, 0x0F02 }, /* 1.8uA short current det, Bias volt =0.9Avdd, +40db gain boost */
+	{ALC5624_MIC_CTRL					, 0x0A02 }, /* 1.8uA short current det, Bias volt =0.9Avdd, +30db gain boost */
 	{ALC5624_PD_CTRL_STAT				, 0x0000 }, /* No powerdown */
 	{ALC5624_MAIN_SDP_CTRL				, 0x8000 }, /* Slave interfase */
 	{ALC5624_PWR_MANAG_ADD1				, 0x003C }, /* Nothing powered down, except I2S interface, and main references */
@@ -840,6 +840,21 @@ static int mixer_event (struct snd_soc_dapm_widget *w,
 }
 
 
+/*
+ * Leave some time for bias to ramp up so we avoid pops - 500ms is what is needed
+ */
+static int micbias_event(struct snd_soc_dapm_widget *w,struct snd_kcontrol *kcontrol, int event)
+{
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		msleep(500);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
 static const struct snd_soc_dapm_widget alc5624_dapm_widgets[] = {
 SND_SOC_DAPM_MUX("Mono Out Mux", SND_SOC_NOPM, 0, 0,
 	&alc5624_mono_mux_controls),
@@ -892,8 +907,9 @@ SND_SOC_DAPM_PGA("Mic 2 PGA", ALC5624_PWR_MANAG_ADD3, 2, 0, NULL, 0),
 SND_SOC_DAPM_PGA("Mic 1 Pre Amp", ALC5624_PWR_MANAG_ADD3, 1, 0, NULL, 0),
 SND_SOC_DAPM_PGA("Mic 2 Pre Amp", ALC5624_PWR_MANAG_ADD3, 0, 0, NULL, 0),
 
-SND_SOC_DAPM_MICBIAS("Mic Bias1", ALC5624_PWR_MANAG_ADD1, 3, 0),
-SND_SOC_DAPM_MICBIAS("Mic Bias2", ALC5624_PWR_MANAG_ADD1, 2, 0),
+SND_SOC_DAPM_MICBIAS_E("Mic Bias1", ALC5624_PWR_MANAG_ADD1, 3, 0, micbias_event, SND_SOC_DAPM_POST_PMU),
+SND_SOC_DAPM_MICBIAS_E("Mic Bias2", ALC5624_PWR_MANAG_ADD1, 2, 0, micbias_event, SND_SOC_DAPM_POST_PMU),
+
 SND_SOC_DAPM_OUTPUT("MONO"),
 SND_SOC_DAPM_OUTPUT("HPL"),
 SND_SOC_DAPM_OUTPUT("HPR"),
@@ -1697,6 +1713,7 @@ static int alc5624_set_bias_level(struct snd_soc_codec *codec,
 			/* Codec sys-clock from PLL */
 			snd_soc_update_bits(codec,ALC5624_GEN_CTRL_REG1, 0x8000,0x8000);
 		}
+		
 		break;
 		
 	case SND_SOC_BIAS_PREPARE:
@@ -1746,7 +1763,7 @@ static int alc5624_set_bias_level(struct snd_soc_codec *codec,
 			snd_soc_update_bits(codec, ALC5624_MISC_CTRL, 0x8000, 0x0000);
 			
 			/* Let it stabilize */
-			msleep(10);
+			msleep(200);
 			
 			/* Disable fast Vref */
 			snd_soc_update_bits(codec, ALC5624_MISC_CTRL, 0x8000, 0x8000);
@@ -2217,8 +2234,6 @@ static __devinit int alc5624_i2c_probe(struct i2c_client *client,
 	alc5624->mic1boost_db = pdata->mic1boost_db;		/* MIC1 gain boost */
 	alc5624->mic2boost_db = pdata->mic2boost_db;		/* MIC2 gain boost */
 	alc5624->default_is_mic2 = pdata->default_is_mic2;	/* If MIC2 is the default MIC or not */
-	
-	
 	
 	i2c_set_clientdata(client, alc5624);
 	alc5624->control_data = client;

@@ -116,6 +116,7 @@ static struct it7260_ts_data *gl_ts;
 #define CMD_CALIBRATE			0x13	/* Mass Production Calibration  */
 #define CMD_RES5				0x14	/* Reserved for internal use */
 #define CMD_SET_PT_THRESH		0x15	/* Set Point Threshold */
+#define CMD_RESET				0x6F	/* Reset fw */
 
 
 static int it7260_read_query_buffer(struct it7260_ts_data *ts,unsigned char * pucData)
@@ -254,27 +255,33 @@ static int it7260_wait_for_idle(struct it7260_ts_data *ts)
 static int it7260_flush(struct it7260_ts_data *ts)
 {
 	int ret = 0;
+	unsigned char pucBuf[14];		
+	unsigned char ucQuery = QUERY_CMD_STATUS_BUSY;
 	dev_info(&ts->client->dev,"flushing buffers\n");	
+	
+	// Try a brute force clean first
+	it7260_read_query_buffer(ts,&ucQuery);
+	it7260_read_point_buffer(ts,pucBuf);
+	it7260_read_command_response_buffer(ts,pucBuf,10);
+	
 	if (ts->client->irq) {
 		// Interrupt assigned, use it to wait
-		unsigned char ucQuery = 0;
-		unsigned char pucPoint[14];
 		int gpio = irq_to_gpio(ts->client->irq);
 		int pollend = jiffies + HZ;	// 1 second of polling, maximum...
 		while( !gpio_get_value(gpio) && jiffies < pollend) {
 			it7260_read_query_buffer(ts,&ucQuery);
-			it7260_read_point_buffer(ts,pucPoint);
+			it7260_read_point_buffer(ts,pucBuf);
+			it7260_read_command_response_buffer(ts,pucBuf,10);
 			schedule();
 		};
 		ret = gpio_get_value(gpio) ? 0 : -1;
 	} else {
 		// No interrupt. Use a polling method
-		unsigned char ucQuery = QUERY_CMD_STATUS_BUSY;
-		unsigned char pucPoint[14];
 		int pollend = jiffies + HZ;	// 1 second of polling, maximum...
 		while( (ucQuery & QUERY_CMD_STATUS_BUSY) && jiffies < pollend) {
 			if (it7260_read_query_buffer(ts,&ucQuery) >= 0) {
-				it7260_read_point_buffer(ts,pucPoint);
+				it7260_read_point_buffer(ts,pucBuf);
+				it7260_read_command_response_buffer(ts,pucBuf,10);
 			} else {
 				ucQuery = QUERY_CMD_STATUS_BUSY;
 			}
@@ -445,7 +452,7 @@ static int it7260_init(struct it7260_ts_data *ts)
 		return -1;
 	}
 		
-	pucCmd[0] = CMD_REINIT_FW;
+	pucCmd[0] = CMD_RESET;
 	ret = it7260_write_command_buffer(ts,pucCmd,1);
 	if (ret < 0) {
 		dev_err(&ts->client->dev,"failed to reset touchpad\n");

@@ -40,7 +40,8 @@ struct evdev {
 struct evdev_client {
 	int head;
 	int tail;
-	spinlock_t buffer_lock; /* protects access to buffer, head and tail */
+	spinlock_t buffer_lock; 	/* protects access to buffer, head and tail */
+	bool use_wakelock;			/* Some devices should NOT use a wakelock - Sensors are good examples of this */
 	struct wake_lock wake_lock;
 	char name[28];
 	struct fasync_struct *fasync;
@@ -62,7 +63,8 @@ static void evdev_pass_event(struct evdev_client *client,
 	 * "empty" by having client->head == client->tail.
 	 */
 	spin_lock(&client->buffer_lock);
-	wake_lock_timeout(&client->wake_lock, 5 * HZ);
+	if (client->use_wakelock)
+		wake_lock_timeout(&client->wake_lock, 5 * HZ);
 	do {
 		client->buffer[client->head++] = *event;
 		client->head &= client->bufsize - 1;
@@ -247,7 +249,8 @@ static int evdev_release(struct inode *inode, struct file *file)
 	mutex_unlock(&evdev->mutex);
 
 	evdev_detach_client(evdev, client);
-	wake_lock_destroy(&client->wake_lock);
+	if (client->use_wakelock)
+		wake_lock_destroy(&client->wake_lock);
 	kfree(client);
 
 	evdev_close_device(evdev);
@@ -263,6 +266,16 @@ static unsigned int evdev_compute_buffer_size(struct input_dev *dev)
 		    EVDEV_MIN_BUFFER_SIZE);
 
 	return roundup_pow_of_two(n_events);
+}
+
+static bool evdev_is_continuous_reporting_sensor(struct input_dev *dev)
+{
+	/* If it has keys of any kind, probably not a sensor ... */
+	if (test_bit(EV_KEY,dev->evbit))
+		return false;
+
+	/* Otherwise, assume it is a sensor */
+	return true;
 }
 
 static int evdev_open(struct inode *inode, struct file *file)
@@ -297,11 +310,15 @@ static int evdev_open(struct inode *inode, struct file *file)
 		goto err_put_evdev;
 	}
 
+	/* Use a wakelock ONLY if not using a continuos reporting sensor */
+	client->use_wakelock = !evdev_is_continuous_reporting_sensor(evdev->handle.dev);
+	
 	client->bufsize = bufsize;
 	spin_lock_init(&client->buffer_lock);
 	snprintf(client->name, sizeof(client->name), "%s-%d",
 			dev_name(&evdev->dev), task_tgid_vnr(current));
-	wake_lock_init(&client->wake_lock, WAKE_LOCK_SUSPEND, client->name);
+	if (client->use_wakelock) 
+		wake_lock_init(&client->wake_lock, WAKE_LOCK_SUSPEND, client->name);
 	client->evdev = evdev;
 	evdev_attach_client(evdev, client);
 
@@ -316,7 +333,8 @@ static int evdev_open(struct inode *inode, struct file *file)
 
  err_free_client:
 	evdev_detach_client(evdev, client);
-	wake_lock_destroy(&client->wake_lock);
+	if (client->use_wakelock)
+		wake_lock_destroy(&client->wake_lock);
 	kfree(client);
  err_put_evdev:
 	put_device(&evdev->dev);
@@ -368,7 +386,7 @@ static int evdev_fetch_next_event(struct evdev_client *client,
 	if (have_event) {
 		*event = client->buffer[client->tail++];
 		client->tail &= client->bufsize - 1;
-		if (client->head == client->tail)
+	 	if (client->head == client->tail && client->use_wakelock)
 			wake_unlock(&client->wake_lock);
 	}
 
