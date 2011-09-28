@@ -53,8 +53,9 @@
 
 #define SHUTTLE_MEM_SIZE 		SZ_512M			/* Total memory */
 
-#define SHUTTLE_GPU_MEM_SIZE 		SZ_128M	/* Memory reserved for GPU */
+/*#define SHUTTLE_GPU_MEM_SIZE 		SZ_128M*/	/* Memory reserved for GPU */
 /*#define SHUTTLE_GPU_MEM_SIZE 	SZ_64M*/			/* Memory reserved for GPU */
+#define SHUTTLE_GPU_MEM_SIZE 	(3*SZ_32M)		/* Memory reserved for GPU */
 
 #define SHUTTLE_FB1_MEM_SIZE 	SZ_8M			/* Memory reserved for Framebuffer 1: LCD */
 #define SHUTTLE_FB2_MEM_SIZE 	SZ_8M			/* Memory reserved for Framebuffer 2: HDMI out */

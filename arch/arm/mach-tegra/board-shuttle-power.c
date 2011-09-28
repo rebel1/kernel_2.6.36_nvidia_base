@@ -380,16 +380,17 @@ static struct virtual_adj_voltage_config vdd_aon_cfg = {
 		.platform_data = _data,			\
 	} 	
 
-/* FIXME: do we have rtc alarm irq? */
-static struct tps6586x_rtc_platform_data shuttle_rtc_data = {
-	.irq = TEGRA_NR_IRQS + TPS6586X_INT_RTC_ALM1,
-        .start = {
-	.year = 2009,
-	.month = 1,
-	.day = 1,
-	          },
-        .cl_sel = TPS6586X_RTC_CL_SEL_1_5PF /* use lowest (external 20pF cap) */
 
+static struct tps6586x_rtc_platform_data shuttle_rtc_data = {
+	.irq	= -1,  /* Shuttlle has no IRQ for this RTC :( */
+	.start = {
+		.year  = 2011,
+		.month = 1,
+		.day   = 1,
+		.hour  = 1,
+		.min   = 1,
+		.sec   = 1,
+	},
 };
 
 static struct tps6586x_subdev_info tps_devs[] = {
