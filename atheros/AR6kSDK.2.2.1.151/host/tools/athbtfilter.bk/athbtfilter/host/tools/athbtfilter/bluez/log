@@ -1,0 +1,15 @@
+/home/edu/android-ndk-r5b/toolchains/arm-eabi-4.4.0/prebuilt/linux-x86/bin/arm-eabi-gcc -c -Wall -g -DABF_DEBUG -nostdlib -mabi=aapcs -I../../../include -I../../../os/linux/include -I../../../../include -I../../../ -I. -I./bluetooth -I/home/edu/android-ndk-r5b/platforms/android-9/arch-arm/usr/include -DANDROID=1 -DANDROID_ENV=1 abtfilt_main.c -o abtfilt_main.o
+abtfilt_main.c: In function 'Abf_SigTerm':
+abtfilt_main.c:75: warning: implicit declaration of function 'AthBtFilter_State_Off'
+/home/edu/android-ndk-r5b/toolchains/arm-eabi-4.4.0/prebuilt/linux-x86/bin/arm-eabi-gcc -c -Wall -g -DABF_DEBUG -nostdlib -mabi=aapcs -I../../../include -I../../../os/linux/include -I../../../../include -I../../../ -I. -I./bluetooth -I/home/edu/android-ndk-r5b/platforms/android-9/arch-arm/usr/include -DANDROID=1 -DANDROID_ENV=1 abtfilt_wlan.c -o abtfilt_wlan.o
+abtfilt_wlan.c: In function 'Abf_WlanCheckSettings':
+abtfilt_wlan.c:629: warning: implicit declaration of function 'isspace'
+/home/edu/android-ndk-r5b/toolchains/arm-eabi-4.4.0/prebuilt/linux-x86/bin/arm-eabi-gcc -c -Wall -g -DABF_DEBUG -nostdlib -mabi=aapcs -I../../../include -I../../../os/linux/include -I../../../../include -I../../../ -I. -I./bluetooth -I/home/edu/android-ndk-r5b/platforms/android-9/arch-arm/usr/include -DANDROID=1 -DANDROID_ENV=1 abtfilt_core.c -o abtfilt_core.o
+/home/edu/android-ndk-r5b/toolchains/arm-eabi-4.4.0/prebuilt/linux-x86/bin/arm-eabi-gcc -c -Wall -g -DABF_DEBUG -nostdlib -mabi=aapcs -I../../../include -I../../../os/linux/include -I../../../../include -I../../../ -I. -I./bluetooth -I/home/edu/android-ndk-r5b/platforms/android-9/arch-arm/usr/include -DANDROID=1 -DANDROID_ENV=1 abtfilt_utils.c -o abtfilt_utils.o
+/home/edu/android-ndk-r5b/toolchains/arm-eabi-4.4.0/prebuilt/linux-x86/bin/arm-eabi-gcc -c -Wall -g -DABF_DEBUG -nostdlib -mabi=aapcs -I../../../include -I../../../os/linux/include -I../../../../include -I../../../ -I. -I./bluetooth -I/home/edu/android-ndk-r5b/platforms/android-9/arch-arm/usr/include -DANDROID=1 -DANDROID_ENV=1 abtfilt_bluez_dbus.c -o abtfilt_bluez_dbus.o
+abtfilt_bluez_dbus.c: In function 'IssueHCICommand':
+abtfilt_bluez_dbus.c:2203: warning: implicit declaration of function 'writev'
+abtfilt_bluez_dbus.c: At top level:
+abtfilt_bluez_dbus.c:226: warning: 'GetRemoteDeviceLMPVersion' declared 'static' but never defined
+/home/edu/android-ndk-r5b/toolchains/arm-eabi-4.4.0/prebuilt/linux-x86/bin/arm-eabi-gcc -o abtfilt abtfilt_main.o abtfilt_wlan.o abtfilt_core.o abtfilt_utils.o abtfilt_bluez_dbus.o crtbegin_dynamic.o -L/host/btfilter -nostdlib -L. -L. -ldbus -lc -lbtfilt -llog -ldl -lbluetooth -lglib -lcutils -lstdc++ -lm
+/home/edu/android-ndk-r5b/toolchains/arm-eabi-4.4.0/prebuilt/linux-x86/bin/../lib/gcc/arm-eabi/4.4.0/../../../../arm-eabi/bin/ld: warning: ./libdbus.so uses 32-bit enums yet the output is to use variable-size enums; use of enum values across objects may fail
